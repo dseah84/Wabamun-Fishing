@@ -61,6 +61,13 @@ li{margin:2px 0}
 .warn{background:rgba(248,81,73,.15);border:1px solid var(--poor);border-radius:8px;padding:6px 10px;margin:8px 0}
 .note{color:var(--muted);font-size:12px;margin-top:12px}
 .tip{background:rgba(79,195,247,.12);border-left:3px solid var(--accent);padding:6px 10px;border-radius:4px;margin:8px 0}
+.watertemp{display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(30,42,56,.7);
+  border-radius:8px;padding:7px 10px;margin:8px 0;cursor:pointer}
+.watertemp .v{font-weight:600}
+.watertemp .k{color:var(--muted);font-size:12px}
+.species{margin:6px 0 12px}
+.species .sphead{display:flex;align-items:center;gap:8px;font-weight:600;margin-bottom:2px}
+.species .splures{color:var(--muted);font-size:12px}
 
 #legend{position:absolute;z-index:1000;right:12px;bottom:calc(56vh + 10px);background:var(--panel);
   border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:11px;width:170px}
@@ -207,7 +214,8 @@ var S = { data:null, idx:0, layer:store('wf.layer')||'wind', flow:store('wf.flow
           sat:store('wf.sat')||false, addMode:false,
           radarOn:store('wf.radar')||false, radarTime:null,
           alerts:null, alertsFailed:false,
-          launches:store('wf.launches')||[], launchMode:false, routesOn:store('wf.routes')||false };
+          launches:store('wf.launches')||[], launchMode:false, routesOn:store('wf.routes')||false,
+          waterTemp:store('wf.waterTemp')||null };
 if(!LAYERS[S.layer]) S.layer='wind';
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 function esc(v){ return String(v).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
@@ -397,6 +405,101 @@ function rating(sc){
   if(sc>=60) return {label:'Good',color:'var(--good)'};
   if(sc>=45) return {label:'Fair',color:'var(--fair)'};
   return {label:'Poor',color:'var(--poor)'};
+}
+
+// ---------- water temp & bite guide ----------
+function relTime(ms){
+  var m=Math.round(ms/60000);
+  if(m<1) return 'just now';
+  if(m<60) return m+'m ago';
+  var h=Math.round(m/60);
+  if(h<48) return h+'h ago';
+  return Math.round(h/24)+'d ago';
+}
+// Rough central-Alberta lake surface climatology by calendar month - a
+// seasonal ballpark, not a measurement. Used only until a real sonar
+// reading is logged, or once a logged one goes stale (past 72h).
+var SEASONAL_WATER_C={1:0,2:0,3:1,4:6,5:12,6:17,7:20,8:20,9:15,10:8,11:3,12:0};
+function seasonalWaterTemp(ms){
+  var month=+new Intl.DateTimeFormat('en-US',{timeZone:CFG.tz,month:'numeric'}).format(ms);
+  return SEASONAL_WATER_C[month];
+}
+function currentWaterTemp(atMs){
+  if(S.waterTemp && S.waterTemp.c!=null){
+    var ageMs=Date.now()-S.waterTemp.at;
+    if(ageMs<=72*3600000) return {c:S.waterTemp.c, measured:true, ageMs:ageMs};
+  }
+  return {c:seasonalWaterTemp(atMs), measured:false, ageMs:null};
+}
+function promptWaterTemp(){
+  var raw=prompt('Surface water temp from your sonar, in °C (e.g. 14.5):');
+  if(raw==null) return;
+  var v=parseFloat(raw);
+  if(!isFinite(v) || v<-2 || v>35){ alert('That doesn\'t look like a water temperature in °C - try a number between -2 and 35.'); return; }
+  S.waterTemp={c:round(v,1), at:Date.now()};
+  store('wf.waterTemp',S.waterTemp);
+  render();
+}
+function lightLevel(t){
+  var mid=S.data.times[t]+1800000, sunAlt=SunCalc.getPosition(new Date(mid),S.spot[0],S.spot[1]).altitude*180/Math.PI;
+  var se=nearest(S.astro.sun,mid,['rise','set']), cloud=sample('cloud',t,S.spot[0],S.spot[1]);
+  if(se && se.dt<=75*60000) return 'low';
+  if(sunAlt<-6) return 'dark';
+  if(cloud!=null && cloud>=70) return 'low';
+  if(cloud!=null && cloud<=20 && sunAlt>25) return 'bright';
+  return 'moderate';
+}
+// General walleye/pike/perch knowledge, not catch data from this lake -
+// the same honesty rule as everything else here: labelled as general
+// advice, not presented as if it came from anglers actually fishing Wabamun.
+function biteGuide(t){
+  var wt=currentWaterTemp(S.data.times[t]), light=lightLevel(t), s=spotAt(t), wind=s.spd, species=[];
+  (function(){ var act,note,lures;
+    if(wt.c<8){ act='Slow'; note='Cold water - walleye sit deep and feed less often.';
+      lures=['Slow jig-and-minnow worked right on bottom','Small blade bait, barely moving']; }
+    else if(light==='low'||light==='dark'){ act='Likely active'; note='Low light is prime walleye feeding time.';
+      lures=['Jig tipped with a minnow','Shallow-diving crankbait over structure','Swim jig along the wind-blown shore']; }
+    else if(wt.c>=10 && wt.c<=20){ act='Good chance'; note='Water is in a good range, but midday sun pushes them deeper or into cover.';
+      lures=['Spinner rig behind a bottom bouncer','Deep-diving crankbait','Jig-and-plastic worked slow along drop-offs']; }
+    else { act='Fair'; note='Bright and/or warm - fish sit tighter to cover or deeper water.';
+      lures=['Slip-bobber with a leech or minnow over deeper structure','Bottom-bouncer spinner rig, trolled slow']; }
+    species.push({name:'Walleye', activity:act, note:note, lures:lures});
+  })();
+  (function(){ var act,note,lures;
+    if(wt.c<6){ act='Slower'; note='Cold water slows pike down, but they still feed.';
+      lures=['Large spoon, slow-rolled','Suspending jerkbait with long pauses']; }
+    else if(wt.c<=18){ act='Likely active'; note='Pike\'s favourite range, especially near weed edges.';
+      lures=['Spinnerbait or bucktail along weed lines','Big swimbait','Wide-wobble spoon']; }
+    else { act='Fair'; note='Warm water pushes pike to shade, deeper weeds, or dawn/dusk.';
+      lures=['Topwater at first or last light','Weedless spoon fished through cabbage weed']; }
+    if(wind!=null && wind>=8) note+=' Worth targeting the wind-blown shore noted above.';
+    species.push({name:'Northern Pike', activity:act, note:note, lures:lures});
+  })();
+  (function(){ var act='Fair chance', note='Perch school near structure and bite over a wide range of conditions.',
+      lures=['Small jig tipped with a worm or minnow','Light spinner rig','Small soft-plastic on a jighead'];
+    if(light==='bright'){ note='Bright and calm - perch school tight to bottom or structure.'; }
+    else { act='Good chance'; note='Moderate to low light often has perch roaming and feeding.'; }
+    species.push({name:'Yellow Perch', activity:act, note:note, lures:lures});
+  })();
+  return {waterTemp:wt, light:light, species:species};
+}
+function waterTempRowHtml(t){
+  var wt=currentWaterTemp(S.data.times[t]);
+  var label=wt.measured
+    ? 'Water '+round(wt.c,1)+'&deg;C <span class="k">(you, '+relTime(wt.ageMs)+')</span>'
+    : 'Water ~'+round(wt.c,0)+'&deg;C <span class="k">(seasonal estimate, not measured)</span>';
+  return '<div class="watertemp" id="watertemprow"><span class="v">'+label+'</span><span class="k">Tap to log a sonar reading &rsaquo;</span></div>';
+}
+function biteGuideHtml(t){
+  var bg=biteGuide(t);
+  var rows=bg.species.map(function(sp){
+    return '<div class="species"><div class="sphead">'+esc(sp.name)+' <span class="note" style="margin:0">- '+esc(sp.activity)+'</span></div>'+
+      '<div class="note" style="margin:0 0 3px">'+esc(sp.note)+'</div>'+
+      '<div class="splures">'+sp.lures.map(esc).join(' &middot; ')+'</div></div>';
+  }).join('');
+  return '<h3>Bite Guide &amp; Suggested Lures</h3>'+rows+
+    '<div class="note">General walleye/pike/perch fishing knowledge applied to these conditions - not catch data from this lake.'+
+    (bg.waterTemp.measured?'':' Water temp is a rough seasonal estimate until you log a real sonar reading.')+'</div>';
 }
 
 // ---------- map ----------
@@ -765,8 +868,10 @@ function render(){
       cell('Cloud',fmt(s.cloud,0,'%'))+
       cell('Precip',fmt(s.precip,1,' mm'))+
     '</div>'+shore+
+    waterTempRowHtml(t)+
     '<h3>Why this score</h3><ul>'+(r.factors.length?r.factors.map(function(x){
       return '<li><span class="'+(x[0]>=0?'pos':'neg')+'">'+(x[0]>=0?'+':'')+x[0]+'</span> '+x[1]+'</li>'; }).join(''):'<li>Baseline 50</li>')+'</ul>'+
+    biteGuideHtml(t)+
     '<h3>Best upcoming windows</h3><ul id="best">'+best+'</ul>'+
     '<h3>Sun &amp; moon</h3><ul>'+
       '<li>Sunrise '+(sr?fmtTime.format(sr.t):'-')+', sunset '+(ss?fmtTime.format(ss.t):'-')+'</li>'+
@@ -903,6 +1008,7 @@ function spotsSectionHtml(t){
   return '<h3>My Spots (ranked for this hour)</h3>'+rows+spotToolsHtml();
 }
 function bindSpotsPanel(){
+  var wtr=$('watertemprow'); if(wtr) wtr.onclick=promptWaterTemp;
   Array.prototype.forEach.call(document.querySelectorAll('[data-golake]'),function(b){
     b.onclick=function(){
       var rg=CFG.regions.filter(function(x){ return x.id===b.getAttribute('data-golake'); })[0]; if(!rg) return;
