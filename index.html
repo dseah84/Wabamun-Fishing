@@ -357,12 +357,28 @@ function rating(sc){
 
 // ---------- map ----------
 var map=L.map('map',{zoomControl:false,attributionControl:true});
+// Frames the lake on load, and re-frames it if the window changes size
+// (a maximize, an orientation flip) - but only while the person hasn't
+// touched the map themselves. Once they pan or zoom, autoView goes stale
+// and this stops overriding them.
+var autoView=null;
 function fitLake(){
   var wide=window.innerWidth>=900;
-  map.fitBounds([[53.50,-114.78],[53.61,-114.40]],{paddingTopLeft:[10,wide?60:90],
+  map.fitBounds([[53.50,-114.78],[53.61,-114.40]],{animate:false,paddingTopLeft:[10,wide?60:90],
     paddingBottomRight:[wide?410:10, wide?10:Math.round(window.innerHeight*0.56)]});
+  autoView={center:map.getCenter(),zoom:map.getZoom()};
 }
 fitLake();
+var resizeTimer=null;
+window.addEventListener('resize',function(){
+  clearTimeout(resizeTimer);
+  resizeTimer=setTimeout(function(){
+    map.invalidateSize();
+    var c=map.getCenter();
+    if(autoView && map.getZoom()===autoView.zoom &&
+       Math.abs(c.lat-autoView.center.lat)<0.001 && Math.abs(c.lng-autoView.center.lng)<0.001) fitLake();
+  },150);
+});
 // Plain OpenStreetMap tiles, inverted with a CSS filter for a dark look.
 // (CARTO's own dark_all tiles started demanding an API key we don't have;
 // raw OSM raster tiles are the one source that has never required one.)
