@@ -126,23 +126,14 @@ li{margin:2px 0}
 
 // ---------- config ----------
 var CFG = {
-  // HRDPS sampling grids, one box per lake, each sampled at its own density
-  // (HRDPS itself is 2.5 km, so anything this fine is real model detail, not
-  // invented resolution). Wabamun's box is confirmed against the real HRDPS
-  // feed. Lake Isle's and Spring Lake's centers are placed from memory, not
-  // looked up - their boxes are padded wider than Wabamun's on purpose to
-  // hedge that, and each is drawn as a dashed rectangle with a label on the
-  // map, so a wrong placement is obvious at a glance rather than silent.
+  // HRDPS sampling grid(s) - kept as a list of regions even with just one,
+  // since the rest of the app (sampling, map boxes, routes) is built to
+  // handle any number of them. Back to Wabamun only; Lake Isle and Spring
+  // Lake were dropped at the user's request.
   regions:[
     { id:'wabamun', name:'Wabamun Lake', center:[53.548,-114.60],
       latMin:53.46, latMax:53.64, lonMin:-114.86, lonMax:-114.34, rows:7, cols:9,
-      labels:[['Wabamun',53.5586,-114.4718],['Seba Beach',53.5553,-114.7340]] },
-    { id:'lakeisle', name:'Lake Isle', center:[53.67,-115.20],
-      latMin:53.58, latMax:53.76, lonMin:-115.38, lonMax:-115.02, rows:6, cols:7,
-      labels:[['Lake Isle',53.67,-115.20]] },
-    { id:'springlake', name:'Spring Lake', center:[53.58,-114.02],
-      latMin:53.50, latMax:53.66, lonMin:-114.14, lonMax:-113.90, rows:5, cols:5,
-      labels:[['Spring Lake',53.58,-114.02]] }
+      labels:[['Wabamun',53.5586,-114.4718],['Seba Beach',53.5553,-114.7340]] }
   ],
   defaultSpot:[53.548,-114.60],
   tz:'America/Edmonton',
@@ -746,9 +737,8 @@ function render(){
              ' <span style="color:var(--muted)">('+(major?'major, ~2h':'minor, ~1h')+')</span></li>'; });
 
   var outside = !inGrid(S.spot[0],S.spot[1]);
-  var oob = outside ? '<div class="warn">This point is outside the HRDPS forecast area (a dashed box on the map) - '+
-    'wind, temp and the rest can\'t be shown here. Tap inside one of the dashed boxes (Wabamun, Lake Isle or Spring Lake), '+
-    'or use "Focus" on a saved spot or lake below.</div>' : '';
+  var oob = outside ? '<div class="warn">This point is outside the HRDPS forecast area (the dashed box on the map) - '+
+    'wind, temp and the rest can\'t be shown here. Tap closer to Wabamun Lake, or use the "Focus" button on a saved spot.</div>' : '';
   var shore=s.dir!=null && s.spd>=8
     ? '<div class="tip">Wind from the <b>'+dir8word(s.dir)+'</b> is pushing water and baitfish onto the <b>'+dir8word(s.dir+180)+
       ' shore</b>. Walleye and pike often feed along that wind-blown side.</div>'
@@ -866,6 +856,7 @@ function spotToolsHtml(){
 // center as the sample point - a "Focus" here jumps the map and the active
 // spot both, so the score panel above starts describing that lake.
 function lakesSectionHtml(t){
+  if(CFG.regions.length<2) return ''; // nothing to rank against with only one lake
   var rows=CFG.regions.map(function(rg){
     var r=scoreHour(t,rg.center[0],rg.center[1]);
     return {rg:rg, score:r.score, unsafe:r.unsafe};
