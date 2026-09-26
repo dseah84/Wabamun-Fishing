@@ -520,7 +520,12 @@ function refreshRadar(){
   }).catch(function(e){ console.warn('Radar unavailable:',e); });
 }
 function addRadarLayer(url){
-  radarLayer=L.tileLayer(url,{maxZoom:12, opacity:.55, attribution:'Radar &copy; RainViewer'}).addTo(map);
+  // RainViewer's radar tiles don't natively resolve past zoom ~8 (it's
+  // weather-radar resolution, not street-map resolution) - past that they
+  // hand back a "Zoom Level Not Supported" placeholder image instead of a
+  // real 404, so a plain maxZoom cap doesn't stop the bad request. Capping
+  // the *native* zoom and letting Leaflet upscale for closer views does.
+  radarLayer=L.tileLayer(url,{maxZoom:19, maxNativeZoom:8, opacity:.55, attribution:'Radar &copy; RainViewer'}).addTo(map);
 }
 $('radar').classList.toggle('on',S.radarOn);
 $('radar').onclick=function(){
