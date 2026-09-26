@@ -215,7 +215,7 @@ var S = { data:null, idx:0, layer:store('wf.layer')||'wind', flow:store('wf.flow
           radarOn:store('wf.radar')||false, radarTime:null,
           alerts:null, alertsFailed:false,
           launches:store('wf.launches')||[], launchMode:false, routesOn:store('wf.routes')||false,
-          waterTemp:store('wf.waterTemp')||null };
+          waterTemp:store('wf.waterTemp')||null, waterClarity:store('wf.waterClarity')||null };
 if(!LAYERS[S.layer]) S.layer='wind';
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 function esc(v){ return String(v).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
@@ -449,37 +449,106 @@ function lightLevel(t){
   if(cloud!=null && cloud<=20 && sunAlt>25) return 'bright';
   return 'moderate';
 }
+// Water clarity - like water temp, there is no real feed for this, so it is
+// a manual tap-to-set reading, not a measurement. Cycles clear/stained/muddy.
+var CLARITY_CYCLE=['clear','stained','muddy'];
+var CLARITY_LABEL={clear:'Clear', stained:'Stained', muddy:'Muddy'};
+function cycleClarity(){
+  var i=S.waterClarity ? CLARITY_CYCLE.indexOf(S.waterClarity) : -1;
+  S.waterClarity=CLARITY_CYCLE[(i+1)%CLARITY_CYCLE.length];
+  store('wf.waterClarity',S.waterClarity);
+  render();
+}
+function waterClarityRowHtml(){
+  var label=S.waterClarity ? CLARITY_LABEL[S.waterClarity] : 'Not set';
+  return '<div class="watertemp" id="waterclarityrow"><span class="v">Water clarity: '+label+'</span>'+
+    '<span class="k">Tap to cycle &rsaquo;</span></div>';
+}
+// Color advice by species and water clarity - general, well-established
+// angling knowledge (dark/bright colors show up better against different
+// water colors and light levels), not tied to any specific product.
+var COLOR_PALETTE={
+  walleye:{clear:{label:'Natural green / perch pattern',swatches:['#4c6b3a','#c9a227','#d8d8c8']},
+    stained:{label:'Chartreuse / orange',swatches:['#c8e000','#ff7f11']},
+    muddy:{label:'Bright chartreuse or glow',swatches:['#e6ff00','#ffffff']},
+    unset:{label:'Natural in clear water, brighter in stain or low light',swatches:['#4c6b3a','#c8e000']}},
+  pike:{clear:{label:'White or silver',swatches:['#e8ecf0','#9fb3c8']},
+    stained:{label:'Black or firetiger',swatches:['#3a3d44','#ff7f11']},
+    muddy:{label:'Black or bright orange',swatches:['#3a3d44','#ff5a1f']},
+    unset:{label:'Bright in clear water, dark silhouette in stain',swatches:['#e8ecf0','#3a3d44']}},
+  perch:{clear:{label:'Natural perch pattern',swatches:['#c9a227','#3a5a3a']},
+    stained:{label:'Chartreuse',swatches:['#c8e000']},
+    muddy:{label:'Chartreuse or orange',swatches:['#c8e000','#ff7f11']},
+    unset:{label:'Natural in clear water, brighter in stain',swatches:['#c9a227','#c8e000']}}
+};
+function colorFor(speciesKey){
+  var p=COLOR_PALETTE[speciesKey];
+  return (S.waterClarity && p[S.waterClarity]) ? p[S.waterClarity] : p.unset;
+}
 // General walleye/pike/perch knowledge, not catch data from this lake -
 // the same honesty rule as everything else here: labelled as general
 // advice, not presented as if it came from anglers actually fishing Wabamun.
+// One lure profile per condition branch, so the guide shows one clear top
+// pick per species rather than a long, undifferentiated list.
 function biteGuide(t){
   var wt=currentWaterTemp(S.data.times[t]), light=lightLevel(t), s=spotAt(t), wind=s.spd, species=[];
-  (function(){ var act,note,lures;
+  (function(){ var act,note,lure;
     if(wt.c<8){ act='Slow'; note='Cold water - walleye sit deep and feed less often.';
-      lures=['Slow jig-and-minnow worked right on bottom','Small blade bait, barely moving']; }
+      lure={name:'Jig & minnow', size:'1/8-1/4oz jig, 2-3in minnow', depth:'Bottom, along drop-offs',
+        presentation:'Slow lift-and-drop, long pauses', rigging:'Round or ball-head jig',
+        howTo:'Let it sink to bottom, then lift the rod tip 6-12 inches and let it fall back on a controlled line - most bites come on the drop. Slow down even more in cold water.',
+        tags:['Passive fish','Bottom contact','Cold water']}; }
     else if(light==='low'||light==='dark'){ act='Likely active'; note='Low light is prime walleye feeding time.';
-      lures=['Jig tipped with a minnow','Shallow-diving crankbait over structure','Swim jig along the wind-blown shore']; }
+      lure={name:'Swim jig', size:'1/4-3/8oz jig, 3in swimbait or plastic', depth:'Shallow to medium, over structure',
+        presentation:'Steady swim retrieve just above cover', rigging:'Swim-style jighead',
+        howTo:'Cast past the target and reel with a steady swim, keeping it just above weed tops or rock. Low light has walleye up shallow and actively chasing.',
+        tags:['Active fish','Low light','Shallow-medium']}; }
     else if(wt.c>=10 && wt.c<=20){ act='Good chance'; note='Water is in a good range, but midday sun pushes them deeper or into cover.';
-      lures=['Spinner rig behind a bottom bouncer','Deep-diving crankbait','Jig-and-plastic worked slow along drop-offs']; }
+      lure={name:'Deep-diving crankbait', size:'2.5-3.5in', depth:'8-15ft, matched to structure depth',
+        presentation:'Steady retrieve, pause after bottom contact', rigging:'Tie direct or with a snap',
+        howTo:'Cast past structure and reel at a steady pace so the bill just ticks bottom. A brief pause after bumping something often triggers a reaction strike.',
+        tags:['Active fish','Covers water','Structure']}; }
     else { act='Fair'; note='Bright and/or warm - fish sit tighter to cover or deeper water.';
-      lures=['Slip-bobber with a leech or minnow over deeper structure','Bottom-bouncer spinner rig, trolled slow']; }
-    species.push({name:'Walleye', activity:act, note:note, lures:lures});
+      lure={name:'Slip-bobber & leech', size:'#4-6 hook, live leech or minnow', depth:'Deeper structure, set to depth',
+        presentation:'Slow drift, let it sit', rigging:'Slip-bobber rig',
+        howTo:'Set the bobber stop just above bottom over deeper structure, then let it drift or sit still. In bright, warm conditions this patient, natural presentation beats anything moving fast.',
+        tags:['Passive fish','Deep structure','Bright/warm']}; }
+    lure.color=colorFor('walleye');
+    species.push({key:'walleye', name:'Walleye', activity:act, note:note, lure:lure});
   })();
-  (function(){ var act,note,lures;
+  (function(){ var act,note,lure;
     if(wt.c<6){ act='Slower'; note='Cold water slows pike down, but they still feed.';
-      lures=['Large spoon, slow-rolled','Suspending jerkbait with long pauses']; }
+      lure={name:'Large spoon', size:'4-6in', depth:'Open water off points',
+        presentation:'Slow, steady wobble', rigging:'Wire leader required - pike bite through line',
+        howTo:'Cast it out, let it flutter down a few seconds, then retrieve slow and steady. In cold water let the spoon do the work rather than ripping it.',
+        tags:['Passive fish','Open water','Cold water']}; }
     else if(wt.c<=18){ act='Likely active'; note='Pike\'s favourite range, especially near weed edges.';
-      lures=['Spinnerbait or bucktail along weed lines','Big swimbait','Wide-wobble spoon']; }
+      lure={name:'Spinnerbait / bucktail', size:'1/2-3/4oz', depth:'1-6ft, weed edges',
+        presentation:'Steady retrieve just above the weeds', rigging:'Wire leader required',
+        howTo:'Cast tight to the weed edge and retrieve steadily, just fast enough to keep the blade turning. Slow down through any gap or point in the weeds - that\'s where a following pike commits.',
+        tags:['Active fish','Weed edges','Wind-blown shore']}; }
     else { act='Fair'; note='Warm water pushes pike to shade, deeper weeds, or dawn/dusk.';
-      lures=['Topwater at first or last light','Weedless spoon fished through cabbage weed']; }
+      lure={name:'Weedless spoon / topwater', size:'3-5in', depth:'Shallow, in and around cabbage weed',
+        presentation:'Slow twitch through cover, or topwater at dawn/dusk', rigging:'Weedless single hook',
+        howTo:'Work it slowly right through the thickest weeds where pike hold in the shade. At first or last light, a topwater walked over the same water often draws a far more violent strike.',
+        tags:['Active at low light','Heavy cover','Warm water']}; }
     if(wind!=null && wind>=8) note+=' Worth targeting the wind-blown shore noted above.';
-    species.push({name:'Northern Pike', activity:act, note:note, lures:lures});
+    lure.color=colorFor('pike');
+    species.push({key:'pike', name:'Northern Pike', activity:act, note:note, lure:lure});
   })();
-  (function(){ var act='Fair chance', note='Perch school near structure and bite over a wide range of conditions.',
-      lures=['Small jig tipped with a worm or minnow','Light spinner rig','Small soft-plastic on a jighead'];
-    if(light==='bright'){ note='Bright and calm - perch school tight to bottom or structure.'; }
-    else { act='Good chance'; note='Moderate to low light often has perch roaming and feeding.'; }
-    species.push({name:'Yellow Perch', activity:act, note:note, lures:lures});
+  (function(){ var act,note,lure;
+    if(light==='bright'){ act='Fair chance'; note='Bright and calm - perch school tight to bottom or structure.';
+      lure={name:'Small jig & worm', size:'Under 2in, 1/16-1/8oz jighead', depth:'Near bottom, tight to structure',
+        presentation:'Slow vertical jigging just off bottom', rigging:'Small jighead',
+        howTo:'Drop straight down near structure and jig gently just off bottom. Perch school tight in bright light - once you find them, stay put and keep working the same small area.',
+        tags:['Schooling fish','Bottom contact','Bright light']}; }
+    else { act='Good chance'; note='Moderate to low light often has perch roaming and feeding.';
+      lure={name:'Small spinner rig', size:'#1-2 blade, small worm', depth:'Near bottom, open flats',
+        presentation:'Slow drift or troll', rigging:'Light spinner harness',
+        howTo:'Drift or troll slowly along the bottom edge of a flat or drop-off. The spinning blade and scent cover water to find roaming schools before you settle in with jigs.',
+        tags:['Schooling fish','Covers water','Flats']}; }
+    lure.color=colorFor('perch');
+    species.push({key:'perch', name:'Yellow Perch', activity:act, note:note, lure:lure});
   })();
   return {waterTemp:wt, light:light, species:species};
 }
@@ -490,16 +559,33 @@ function waterTempRowHtml(t){
     : 'Water ~'+round(wt.c,0)+'&deg;C <span class="k">(seasonal estimate, not measured)</span>';
   return '<div class="watertemp" id="watertemprow"><span class="v">'+label+'</span><span class="k">Tap to log a sonar reading &rsaquo;</span></div>';
 }
+function swatchHtml(hexes){
+  return hexes.map(function(h){ return '<span style="display:inline-block;width:12px;height:12px;border-radius:50%;'+
+    'background:'+h+';border:1px solid rgba(255,255,255,.55);margin-right:3px"></span>'; }).join('');
+}
 function biteGuideHtml(t){
   var bg=biteGuide(t);
   var rows=bg.species.map(function(sp){
-    return '<div class="species"><div class="sphead">'+esc(sp.name)+' <span class="note" style="margin:0">- '+esc(sp.activity)+'</span></div>'+
-      '<div class="note" style="margin:0 0 3px">'+esc(sp.note)+'</div>'+
-      '<div class="splures">'+sp.lures.map(esc).join(' &middot; ')+'</div></div>';
+    var l=sp.lure;
+    return '<div class="species">'+
+      '<div class="sphead">'+esc(sp.name)+' <span class="note" style="margin:0">- '+esc(sp.activity)+'</span></div>'+
+      '<div class="note" style="margin:0 0 6px">'+esc(sp.note)+'</div>'+
+      '<details><summary style="cursor:pointer"><span class="tag sm" style="background:var(--great);margin-right:6px">Top pick</span>'+
+        '<b>'+esc(l.name)+'</b></summary>'+
+      '<div style="margin-top:8px">'+
+        '<div style="margin-bottom:6px">'+swatchHtml(l.color.swatches)+' '+esc(l.color.label)+'</div>'+
+        '<div class="tip" style="margin:6px 0"><b>How to fish it:</b> '+esc(l.howTo)+'</div>'+
+        '<div class="splures" style="margin-bottom:6px">'+l.tags.map(esc).join(' &middot; ')+'</div>'+
+        '<div class="grid" style="grid-template-columns:1fr 1fr">'+
+          cell('Bait size',esc(l.size))+cell('Depth & habitat',esc(l.depth))+
+          cell('Presentation',esc(l.presentation))+cell('Rigging',esc(l.rigging))+
+        '</div>'+
+      '</div></details></div>';
   }).join('');
   return '<h3>Bite Guide &amp; Suggested Lures</h3>'+rows+
     '<div class="note">General walleye/pike/perch fishing knowledge applied to these conditions - not catch data from this lake.'+
-    (bg.waterTemp.measured?'':' Water temp is a rough seasonal estimate until you log a real sonar reading.')+'</div>';
+    (bg.waterTemp.measured?'':' Water temp is a rough seasonal estimate until you log a real sonar reading.')+
+    (S.waterClarity?'':' Set water clarity above for a clarity-specific color pick.')+'</div>';
 }
 
 // ---------- map ----------
@@ -869,6 +955,7 @@ function render(){
       cell('Precip',fmt(s.precip,1,' mm'))+
     '</div>'+shore+
     waterTempRowHtml(t)+
+    waterClarityRowHtml()+
     '<h3>Why this score</h3><ul>'+(r.factors.length?r.factors.map(function(x){
       return '<li><span class="'+(x[0]>=0?'pos':'neg')+'">'+(x[0]>=0?'+':'')+x[0]+'</span> '+x[1]+'</li>'; }).join(''):'<li>Baseline 50</li>')+'</ul>'+
     biteGuideHtml(t)+
@@ -1009,6 +1096,7 @@ function spotsSectionHtml(t){
 }
 function bindSpotsPanel(){
   var wtr=$('watertemprow'); if(wtr) wtr.onclick=promptWaterTemp;
+  var wcr=$('waterclarityrow'); if(wcr) wcr.onclick=cycleClarity;
   Array.prototype.forEach.call(document.querySelectorAll('[data-golake]'),function(b){
     b.onclick=function(){
       var rg=CFG.regions.filter(function(x){ return x.id===b.getAttribute('data-golake'); })[0]; if(!rg) return;
