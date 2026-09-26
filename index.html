@@ -94,6 +94,7 @@ li{margin:2px 0}
   <div class="chips" id="layers"></div>
   <button class="chip on" id="ptoggle" title="Animated wind particles">Flow</button>
   <button class="chip" id="sat" title="Satellite imagery">Sat</button>
+  <button class="chip" id="radar" title="Live rain radar (RainViewer)">Radar</button>
   <button class="chip" id="addspotbtn" title="Tap the map to drop a saved spot">+ Spot</button>
   <button class="chip" id="refresh" title="Fetch the latest HRDPS run">Refresh</button>
 </div>
@@ -180,7 +181,9 @@ function ramp(stops,v){
 var S = { data:null, idx:0, layer:store('wf.layer')||'wind', flow:store('wf.flow')!==false,
           spot:store('wf.spot')||CFG.defaultSpot, scores:[], astro:null, playing:null,
           spots:store('wf.spots')||[], catches:store('wf.catches')||[],
-          sat:store('wf.sat')||false, addMode:false };
+          sat:store('wf.sat')||false, addMode:false,
+          radarOn:store('wf.radar')||false, radarTime:null,
+          alerts:null, alertsFailed:false };
 if(!LAYERS[S.layer]) S.layer='wind';
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 function esc(v){ return String(v).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
@@ -498,6 +501,35 @@ function frame(){
   }
   fctx.stroke();
 }
+// ---------- live radar (RainViewer - free, no key) ----------
+// Shows the most recent observed rain/snow radar sweep. Independent of the
+// HRDPS time slider: radar only exists for "right now" and the last couple
+// of hours, so scrubbing our 48h forecast against it wouldn't mean anything.
+var radarLayer=null, radarTimer=null;
+function refreshRadar(){
+  fetch('https://api.rainviewer.com/public/weather-maps.json').then(function(r){
+    if(!r.ok) throw new Error(String(r.status)); return r.json();
+  }).then(function(j){
+    var frames=j&&j.radar&&j.radar.past; if(!frames||!frames.length) return;
+    var latest=frames[frames.length-1];
+    var url=j.host+latest.path+'/256/{z}/{x}/{y}/2/1_1.png';
+    S.radarTime=latest.time*1000;
+    if(radarLayer){ radarLayer.setUrl(url); }
+    else if(S.radarOn){ addRadarLayer(url); }
+    if(S.radarOn) $('radar').title='Live rain radar (RainViewer) - swept '+fmtTime.format(S.radarTime);
+  }).catch(function(e){ console.warn('Radar unavailable:',e); });
+}
+function addRadarLayer(url){
+  radarLayer=L.tileLayer(url,{maxZoom:12, opacity:.55, attribution:'Radar &copy; RainViewer'}).addTo(map);
+}
+$('radar').classList.toggle('on',S.radarOn);
+$('radar').onclick=function(){
+  S.radarOn=!S.radarOn; store('wf.radar',S.radarOn); this.classList.toggle('on',S.radarOn);
+  if(S.radarOn){ refreshRadar(); if(radarTimer) clearInterval(radarTimer); radarTimer=setInterval(refreshRadar,120000); }
+  else{ if(radarLayer){ radarLayer.remove(); radarLayer=null; } if(radarTimer){ clearInterval(radarTimer); radarTimer=null; } this.title='Live rain radar (RainViewer)'; }
+};
+if(S.radarOn){ refreshRadar(); radarTimer=setInterval(refreshRadar,120000); }
+
 map.on('move zoom',function(){ fctx.clearRect(0,0,W,H); drawHeat(); });
 map.on('moveend zoomend',function(){ GR=gridRect(); resetParticles(); drawHeat(); });
 map.on('resize',function(){ sizeCanvases(); drawHeat(); });
@@ -604,6 +636,7 @@ function render(){
     '<li>No Good-or-better windows in this HRDPS run.</li>';
 
   $('detail').innerHTML=
+    alertsHtml()+
     '<div class="score"><div class="big">'+r.score+'</div><div><span class="tag" style="background:'+(r.unsafe?'var(--poor)':rt.color)+'">'+
       (r.unsafe?'Unsafe':rt.label)+'</span><div class="note" style="margin:4px 0 0">Fishing outlook at your spot ('+
       S.spot[0].toFixed(3)+', '+S.spot[1].toFixed(3)+')</div></div></div>'+
@@ -634,6 +667,35 @@ function render(){
   bindSpotsPanel();
 }
 function cell(k,v){ return '<div class="cell"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>'; }
+
+// ---------- Environment Canada weather alerts ----------
+// Best-effort: tries ECCC's public alerts API for a live count. If that API
+// ever changes shape or the guess here is wrong, this fails quietly and the
+// direct link below still always works - that link, not the live count, is
+// the part you can rely on.
+var ALERTS_LINK='https://weather.gc.ca/warnings/index_e.html?prov=ab';
+function fetchAlerts(){
+  var bbox=[CFG.lonMin,CFG.latMin,CFG.lonMax,CFG.latMax].join(',');
+  fetch('https://api.weather.gc.ca/collections/alerts/items?bbox='+bbox+'&f=json&limit=50')
+    .then(function(r){ if(!r.ok) throw new Error(String(r.status)); return r.json(); })
+    .then(function(j){ S.alerts=(j&&j.features)||[]; S.alertsFailed=false; if(S.data) render(); })
+    .catch(function(e){ console.warn('Alerts check unavailable:',e); S.alertsFailed=true; if(S.data) render(); });
+}
+function alertsHtml(){
+  var link='<a href="'+ALERTS_LINK+'" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">'+
+    'Check Environment Canada alerts for this area &#8599;</a>';
+  if(S.alerts && S.alerts.length){
+    return '<div class="warn">'+S.alerts.length+' active Environment Canada alert'+(S.alerts.length>1?'s':'')+
+      ' may cover this area. '+link+'</div>';
+  }
+  if(S.alertsFailed){
+    return '<div class="note" style="margin:0 0 8px">Could not check for active alerts automatically. '+link+'</div>';
+  }
+  if(S.alerts){
+    return '<div class="note" style="margin:0 0 8px">No active alerts found nearby (automatic check). '+link+'</div>';
+  }
+  return '<div class="note" style="margin:0 0 8px">'+link+'</div>';
+}
 
 // ---------- Garmin GPX waypoints ----------
 function importGpx(text){
@@ -758,6 +820,8 @@ buildLayerChips(); renderLegend(); sizeCanvases(); GR=gridRect();
 requestAnimationFrame(frame);
 load(false);
 setInterval(function(){ if(!document.hidden) load(false); }, 30*60000);
+fetchAlerts();
+setInterval(function(){ if(!document.hidden) fetchAlerts(); }, 10*60000);
 })();
 </script>
 </body>
