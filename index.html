@@ -1,0 +1,739 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f1720">
+<title>Wabamun Fishing Weather</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{
+  --bg:#0f1720; --panel:rgba(15,23,32,.94); --ink:#e6edf3; --muted:#8b9bab; --line:#2a3746;
+  --accent:#4fc3f7; --great:#2ea0ff; --good:#3fb950; --fair:#d29922; --poor:#f85149;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+  font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+#map{position:absolute;inset:0;background:#0b1118}
+.fx{position:absolute;top:0;left:0;pointer-events:none;z-index:450}
+button{font:inherit;color:inherit;cursor:pointer}
+
+#top{position:absolute;top:0;left:0;right:0;z-index:1000;display:flex;flex-wrap:wrap;gap:8px;
+  align-items:center;padding:10px 12px;padding-top:max(10px,env(safe-area-inset-top));
+  background:linear-gradient(var(--panel),rgba(15,23,32,0));pointer-events:none}
+#top > *{pointer-events:auto}
+#top h1{font-size:16px;margin:0 8px 0 0;white-space:nowrap}
+.chips{display:flex;gap:4px;flex-wrap:wrap}
+.chip{background:rgba(30,42,56,.9);border:1px solid var(--line);border-radius:16px;padding:4px 11px;font-size:13px}
+.chip.on{background:var(--accent);color:#06121b;border-color:var(--accent);font-weight:600}
+#refresh{margin-left:auto}
+
+#sheet{position:absolute;z-index:1000;left:0;right:0;bottom:0;max-height:56vh;overflow:auto;
+  background:var(--panel);border-top:1px solid var(--line);border-radius:14px 14px 0 0;
+  padding:10px 14px calc(12px + env(safe-area-inset-bottom))}
+@media (min-width:900px){
+  #sheet{left:auto;top:64px;right:12px;bottom:12px;width:390px;max-height:none;border:1px solid var(--line);border-radius:14px}
+  #legend{right:414px !important}
+}
+.row{display:flex;align-items:center;gap:10px}
+#play{width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:#1b2a3a;flex:none}
+#slider{flex:1;accent-color:var(--accent)}
+#when{font-weight:600;min-width:120px;text-align:right;white-space:nowrap}
+
+#strip{display:flex;align-items:flex-end;gap:2px;height:54px;margin:10px 0 2px;position:relative}
+#strip .b{flex:1;min-width:4px;border-radius:2px 2px 0 0;cursor:pointer;opacity:.85}
+#strip .b.past{opacity:.3}
+#strip .b.sel{outline:2px solid #fff;outline-offset:1px;opacity:1}
+#days{display:flex;font-size:11px;color:var(--muted);position:relative;height:14px}
+#days span{position:absolute;white-space:nowrap}
+
+.score{display:flex;align-items:center;gap:12px;margin:12px 0 8px}
+.big{font-size:34px;font-weight:700;line-height:1}
+.tag{padding:2px 8px;border-radius:10px;font-weight:600;font-size:13px;color:#06121b}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0}
+.cell{background:rgba(30,42,56,.7);border-radius:8px;padding:6px 8px}
+.cell .k{font-size:11px;color:var(--muted)}
+.cell .v{font-size:16px;font-weight:600}
+h3{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:14px 0 6px}
+ul{margin:0;padding-left:18px}
+li{margin:2px 0}
+.pos{color:var(--good)} .neg{color:var(--poor)}
+.warn{background:rgba(248,81,73,.15);border:1px solid var(--poor);border-radius:8px;padding:6px 10px;margin:8px 0}
+.note{color:var(--muted);font-size:12px;margin-top:12px}
+.tip{background:rgba(79,195,247,.12);border-left:3px solid var(--accent);padding:6px 10px;border-radius:4px;margin:8px 0}
+
+#legend{position:absolute;z-index:1000;right:12px;bottom:calc(56vh + 10px);background:var(--panel);
+  border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:11px;width:170px}
+@media (min-width:900px){#legend{bottom:12px}}
+#legend .bar{height:8px;border-radius:4px;margin:4px 0 2px}
+#legend .ends{display:flex;justify-content:space-between;color:var(--muted)}
+
+#status{position:absolute;z-index:1100;top:50%;left:50%;transform:translate(-50%,-50%);
+  background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 18px;max-width:86vw;text-align:center}
+#status:empty{display:none}
+.spot-icon{width:16px;height:16px;border-radius:50%;background:var(--accent);border:3px solid #fff;box-shadow:0 0 0 2px rgba(0,0,0,.4)}
+.flag-icon{width:12px;height:12px;background:#ffb703;border:2px solid #06121b;transform:rotate(45deg);box-shadow:0 0 0 1px rgba(255,255,255,.7)}
+.spotrow{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.spotrow:last-of-type{border-bottom:0}
+.spotmain{display:flex;align-items:center;gap:6px;min-width:0}
+.spotname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.spotbtns{display:flex;gap:4px;flex:none}
+.chip.sm{padding:2px 8px;font-size:11px}
+.tag.sm{padding:1px 6px;font-size:11px}
+.leaflet-container{background:#0b1118}
+.leaflet-tooltip{background:rgba(15,23,32,.8);color:var(--ink);border:0;box-shadow:none;font-size:11px;padding:1px 5px}
+.leaflet-tooltip-right:before{display:none}
+.leaflet-control-attribution{font-size:10px}
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div id="top">
+  <h1>Wabamun Fishing</h1>
+  <div class="chips" id="layers"></div>
+  <button class="chip on" id="ptoggle" title="Animated wind particles">Flow</button>
+  <button class="chip" id="sat" title="Satellite imagery">Sat</button>
+  <button class="chip" id="addspotbtn" title="Tap the map to drop a saved spot">+ Spot</button>
+  <button class="chip" id="refresh" title="Fetch the latest HRDPS run">Refresh</button>
+</div>
+
+<div id="legend"></div>
+
+<div id="sheet">
+  <div class="row">
+    <button id="play" aria-label="Play">&#9654;</button>
+    <input id="slider" type="range" min="0" max="0" value="0">
+    <div id="when">-</div>
+  </div>
+  <div id="strip"></div>
+  <div id="days"></div>
+  <div id="detail"></div>
+</div>
+
+<div id="status">Loading HRDPS forecast...</div>
+
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/suncalc@1.9.0/suncalc.js"></script>
+<script>
+(function(){
+'use strict';
+
+// ---------- config ----------
+var CFG = {
+  // HRDPS sampling grid over Wabamun Lake and its shores (about 4 km spacing;
+  // HRDPS itself is 2.5 km, so every sample is a real model cell).
+  latMin:53.46, latMax:53.64, lonMin:-114.86, lonMax:-114.34, rows:7, cols:9,
+  defaultSpot:[53.548,-114.60],
+  tz:'America/Edmonton',
+  hours:48, past:3,
+  api:'https://api.open-meteo.com/v1/gem',
+  model:'gem_hrdps_continental'
+};
+var VARS = ['wind_speed_10m','wind_direction_10m','wind_gusts_10m','temperature_2m',
+            'pressure_msl','cloud_cover','precipitation'];
+var KEYS = {wind_speed_10m:'spd',wind_direction_10m:'dir',wind_gusts_10m:'gust',
+            temperature_2m:'temp',pressure_msl:'pres',cloud_cover:'cloud',precipitation:'precip'};
+
+var WIND_STOPS = [[0,[54,86,168,1]],[8,[47,143,191,1]],[16,[47,179,138,1]],[24,[156,204,58,1]],
+                  [32,[240,192,48,1]],[42,[240,122,42,1]],[55,[217,58,58,1]],[70,[160,48,154,1]]];
+var LAYERS = {
+  wind: {label:'Wind', unit:'km/h', field:'spd', stops:WIND_STOPS},
+  gust: {label:'Gusts', unit:'km/h', field:'gust', stops:WIND_STOPS},
+  temp: {label:'Temp', unit:'°C', field:'temp', stops:[[-30,[106,61,154,1]],[-20,[59,76,192,1]],[-10,[61,143,209,1]],
+         [0,[111,198,201,1]],[8,[156,204,58,1]],[16,[240,192,48,1]],[24,[240,122,42,1]],[32,[217,58,58,1]]]},
+  rain: {label:'Rain', unit:'mm/h', field:'precip', stops:[[0,[80,140,220,0]],[0.1,[110,170,240,.5]],[0.5,[60,120,230,.8]],
+         [2,[40,70,200,1]],[5,[150,60,200,1]],[10,[230,70,160,1]]]},
+  cloud:{label:'Cloud', unit:'%', field:'cloud', stops:[[0,[200,210,220,0]],[30,[200,210,220,.25]],[70,[215,222,230,.6]],[100,[235,240,245,.85]]]}
+};
+
+// ---------- small helpers ----------
+function $(id){ return document.getElementById(id); }
+function store(k,v){ try{ if(v===undefined) return JSON.parse(localStorage.getItem(k)); localStorage.setItem(k,JSON.stringify(v)); }catch(e){ return null; } }
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+function round(v,d){ if(v==null) return null; var m=Math.pow(10,d||0); return Math.round(v*m)/m; }
+function fmt(v,d,u){ return v==null ? '-' : round(v,d)+(u||''); }
+var DIR16 = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+var DIR8W = ['north','north-east','east','south-east','south','south-west','west','north-west'];
+function dir16(d){ return DIR16[Math.round(((d%360)+360)%360/22.5)%16]; }
+function dir8word(d){ return DIR8W[Math.round(((d%360)+360)%360/45)%8]; }
+var fmtHour = new Intl.DateTimeFormat('en-US',{timeZone:CFG.tz,weekday:'short',hour:'numeric'});
+var fmtTime = new Intl.DateTimeFormat('en-US',{timeZone:CFG.tz,hour:'numeric',minute:'2-digit'});
+var fmtDay  = new Intl.DateTimeFormat('en-US',{timeZone:CFG.tz,weekday:'short',month:'short',day:'numeric'});
+var fmtHr24 = new Intl.DateTimeFormat('en-US',{timeZone:CFG.tz,hour:'numeric',hourCycle:'h23'});
+function localHour(ms){ return parseInt(fmtHr24.format(ms),10) % 24; }
+
+function ramp(stops,v){
+  if(v<=stops[0][0]) return stops[0][1];
+  for(var i=1;i<stops.length;i++){
+    if(v<=stops[i][0]){
+      var a=stops[i-1], b=stops[i], t=(v-a[0])/(b[0]-a[0]);
+      return [a[1][0]+(b[1][0]-a[1][0])*t, a[1][1]+(b[1][1]-a[1][1])*t,
+              a[1][2]+(b[1][2]-a[1][2])*t, a[1][3]+(b[1][3]-a[1][3])*t];
+    }
+  }
+  return stops[stops.length-1][1];
+}
+
+// ---------- state ----------
+var S = { data:null, idx:0, layer:store('wf.layer')||'wind', flow:store('wf.flow')!==false,
+          spot:store('wf.spot')||CFG.defaultSpot, scores:[], astro:null, playing:null,
+          spots:store('wf.spots')||[], catches:store('wf.catches')||[],
+          sat:store('wf.sat')||false, addMode:false };
+if(!LAYERS[S.layer]) S.layer='wind';
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function esc(v){ return String(v).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+// ---------- data ----------
+function gridPoints(){
+  var pts=[];
+  for(var r=0;r<CFG.rows;r++) for(var c=0;c<CFG.cols;c++)
+    pts.push([CFG.latMin+r*(CFG.latMax-CFG.latMin)/(CFG.rows-1), CFG.lonMin+c*(CFG.lonMax-CFG.lonMin)/(CFG.cols-1)]);
+  return pts;
+}
+
+function fetchForecast(){
+  var pts=gridPoints();
+  var url = CFG.api+'?latitude='+pts.map(function(p){return p[0].toFixed(4);}).join(',')+
+    '&longitude='+pts.map(function(p){return p[1].toFixed(4);}).join(',')+
+    '&hourly='+VARS.join(',')+'&models='+CFG.model+
+    '&forecast_hours='+CFG.hours+'&past_hours='+CFG.past+
+    '&timeformat=unixtime&wind_speed_unit=kmh&timezone=GMT';
+  return fetch(url).then(function(res){
+    if(!res.ok) return res.text().then(function(t){ throw new Error('Weather service said '+res.status+': '+t.slice(0,160)); });
+    return res.json();
+  }).then(function(j){ return Array.isArray(j)?j:[j]; });
+}
+
+// Turn the per-point API response into per-hour flat fields, and trim hours
+// the HRDPS run does not cover (it only goes out 48 h).
+function buildData(raw, fetchedAt){
+  var n=CFG.rows*CFG.cols;
+  if(raw.length!==n) throw new Error('Expected '+n+' grid points, got '+raw.length);
+  var times=raw[0].hourly.time, T=times.length;
+  var f={spd:[],dir:[],gust:[],temp:[],pres:[],cloud:[],precip:[],u:[],v:[]};
+  for(var t=0;t<T;t++){
+    for(var key in f) f[key].push(new Array(n));
+    for(var k=0;k<n;k++){
+      var h=raw[k].hourly;
+      VARS.forEach(function(name){ var a=h[name]; f[KEYS[name]][t][k] = (a && a[t]!=null) ? a[t] : null; });
+      var s=f.spd[t][k], d=f.dir[t][k];
+      if(s!=null && d!=null){ var rad=d*Math.PI/180; f.u[t][k]=-s*Math.sin(rad); f.v[t][k]=-s*Math.cos(rad); }
+      else { f.u[t][k]=null; f.v[t][k]=null; }
+    }
+  }
+  var has=function(t){ return f.u[t].some(function(x){return x!=null;}); };
+  var a=0,b=T-1; while(a<T && !has(a)) a++; while(b>a && !has(b)) b--;
+  if(a>=T) throw new Error('HRDPS returned no wind data for Wabamun right now. Try Refresh in a bit.');
+  var out={times:times.slice(a,b+1).map(function(s){return s*1000;}), fetchedAt:fetchedAt};
+  for(key in f) out[key]=f[key].slice(a,b+1);
+  return out;
+}
+
+// Bilinear sample of a field at hour t. Returns null outside the grid.
+function sample(field,t,lat,lon){
+  var D=S.data; if(!D || !D[field] || !D[field][t]) return null;
+  var fx=(lon-CFG.lonMin)/(CFG.lonMax-CFG.lonMin)*(CFG.cols-1);
+  var fy=(lat-CFG.latMin)/(CFG.latMax-CFG.latMin)*(CFG.rows-1);
+  if(fx<0||fy<0||fx>CFG.cols-1||fy>CFG.rows-1) return null;
+  var c0=Math.min(Math.floor(fx),CFG.cols-2), r0=Math.min(Math.floor(fy),CFG.rows-2), tx=fx-c0, ty=fy-r0;
+  var g=D[field][t], C=CFG.cols;
+  var q=[g[r0*C+c0],g[r0*C+c0+1],g[(r0+1)*C+c0],g[(r0+1)*C+c0+1]], w=[(1-tx)*(1-ty),tx*(1-ty),(1-tx)*ty,tx*ty];
+  var sum=0,ws=0; for(var i=0;i<4;i++) if(q[i]!=null){ sum+=q[i]*w[i]; ws+=w[i]; }
+  return ws>0.25 ? sum/ws : null;
+}
+function windAt(t,lat,lon){
+  var u=sample('u',t,lat,lon), v=sample('v',t,lat,lon);
+  return (u==null||v==null) ? null : {u:u,v:v};
+}
+function spotAt(t,lat,lon){
+  lat=lat==null?S.spot[0]:lat; lon=lon==null?S.spot[1]:lon;
+  var w=windAt(t,lat,lon), o={};
+  ['gust','temp','pres','cloud','precip'].forEach(function(k){ o[k]=sample(k,t,lat,lon); });
+  if(w){ o.spd=Math.hypot(w.u,w.v); o.dir=(Math.atan2(-w.u,-w.v)*180/Math.PI+360)%360; } else { o.spd=null; o.dir=null; }
+  return o;
+}
+
+// ---------- sun & moon (SunCalc) ----------
+function buildAstro(){
+  var D=S.data, lat=S.spot[0], lon=S.spot[1], t0=D.times[0]-86400000, t1=D.times[D.times.length-1]+86400000;
+  var step=5*60000, sun=[], moon=[], ps=null, pm=null, pmm=null, pmd=0;
+  for(var t=t0;t<=t1;t+=step){
+    var sa=SunCalc.getPosition(new Date(t),lat,lon).altitude*180/Math.PI;
+    var ma=SunCalc.getMoonPosition(new Date(t),lat,lon).altitude*180/Math.PI;
+    if(ps!=null){
+      if(ps<-0.833 && sa>=-0.833) sun.push({t:t,type:'rise'});
+      if(ps>=-0.833 && sa<-0.833) sun.push({t:t,type:'set'});
+    }
+    if(pm!=null){
+      if(pm<0.133 && ma>=0.133) moon.push({t:t,type:'rise'});
+      if(pm>=0.133 && ma<0.133) moon.push({t:t,type:'set'});
+      var d=ma-pm;
+      if(pmd>0 && d<=0) moon.push({t:t-step,type:'overhead'});
+      if(pmd<0 && d>=0) moon.push({t:t-step,type:'underfoot'});
+      pmd=d;
+    }
+    ps=sa; pm=ma;
+  }
+  return {sun:sun,moon:moon};
+}
+function nearest(events,t,types){
+  var best=null;
+  events.forEach(function(e){ if(types.indexOf(e.type)<0) return;
+    var dt=Math.abs(e.t-t); if(!best||dt<best.dt) best={e:e,dt:dt}; });
+  return best;
+}
+function moonPhaseName(p){
+  var names=['New moon','Waxing crescent','First quarter','Waxing gibbous','Full moon','Waning gibbous','Last quarter','Waning crescent'];
+  return names[Math.round(p*8)%8];
+}
+
+// ---------- fishing score ----------
+// Rules of thumb for Wabamun walleye / pike / perch. Transparent on purpose:
+// every point added or removed is listed in the panel.
+function scoreHour(t,lat,lon){
+  lat=lat==null?S.spot[0]:lat; lon=lon==null?S.spot[1]:lon;
+  var s=spotAt(t,lat,lon), mid=S.data.times[t]+1800000, f=[], sc=50, unsafe=false;
+  function add(p,txt){ sc+=p; f.push([p,txt]); }
+
+  if(s.spd!=null){
+    if(s.spd<4) add(-3,'Nearly calm - fish in clear water spook easily');
+    else if(s.spd<12) add(8,'Light ripple on the water');
+    else if(s.spd<25) add(12,'Good "walleye chop" - breaks up light, stirs bait');
+    else if(s.spd<35) add(-6,'Windy - boat control gets hard');
+    else add(-18,'Strong wind');
+  }
+  if(s.gust!=null && s.gust>=45){ add(-25,'Gusts '+Math.round(s.gust)+' km/h - unsafe for small boats'); unsafe=true; }
+
+  if(t>=3){
+    var p0=sample('pres',t-3,lat,lon);
+    if(p0!=null && s.pres!=null){
+      var dp=s.pres-p0;
+      if(dp<=-3) add(4,'Pressure dropping fast ('+round(dp,1)+' hPa/3h) - storm front possible');
+      else if(dp<=-0.7) add(12,'Pressure falling ('+round(dp,1)+' hPa/3h) - fish often feed ahead of a front');
+      else if(dp<0.7) add(5,'Pressure steady');
+      else if(dp<2) add(-5,'Pressure rising ('+'+'+round(dp,1)+' hPa/3h)');
+      else add(-12,'Pressure rising fast - post-front, bite often slows');
+    }
+  }
+
+  // Sun/moon events (S.astro) are computed once for the lake, not per spot - every
+  // saved spot is within a few km, so rise/set/solunar timing does not meaningfully differ.
+  var sunAlt=SunCalc.getPosition(new Date(mid),lat,lon).altitude*180/Math.PI;
+  var se=nearest(S.astro.sun,mid,['rise','set']);
+  if(se && se.dt<=75*60000) add(15,'Low light around sun'+se.e.type+' - prime feeding time');
+  else if(sunAlt<-6) add(-8,'Dark');
+  else if(s.cloud!=null && s.cloud>=70) add(8,'Overcast - fish roam shallower');
+  else if(s.cloud!=null && s.cloud<=20 && sunAlt>25) add(-5,'Bright, clear sky - fish hold deeper');
+
+  var maj=nearest(S.astro.moon,mid,['overhead','underfoot']);
+  var min=nearest(S.astro.moon,mid,['rise','set']);
+  if(maj && maj.dt<=60*60000) add(8,'Solunar major period (moon '+maj.e.type+')');
+  else if(min && min.dt<=40*60000) add(4,'Solunar minor period (moon '+min.e.type+')');
+
+  if(s.precip!=null){
+    if(s.precip>=3) add(-10,'Heavy rain');
+    else if(s.precip>=0.1) add(4,'Light rain');
+  }
+  if(s.temp!=null && s.temp<=-25) add(-8,'Bitter cold');
+
+  return {score:clamp(Math.round(sc),0,100), factors:f, unsafe:unsafe, s:s};
+}
+// Rank every saved spot for hour t using the same rule-of-thumb score, just
+// centred on that spot's own coordinates instead of the active one.
+function rankedSpots(t){
+  return S.spots.map(function(sp){
+    var r=scoreHour(t,sp.lat,sp.lon);
+    return {spot:sp, score:r.score, unsafe:r.unsafe, s:r.s};
+  }).sort(function(a,b){ return b.score-a.score; });
+}
+function rating(sc){
+  if(sc>=75) return {label:'Great',color:'var(--great)'};
+  if(sc>=60) return {label:'Good',color:'var(--good)'};
+  if(sc>=45) return {label:'Fair',color:'var(--fair)'};
+  return {label:'Poor',color:'var(--poor)'};
+}
+
+// ---------- map ----------
+var map=L.map('map',{zoomControl:false,attributionControl:true});
+function fitLake(){
+  var wide=window.innerWidth>=900;
+  map.fitBounds([[53.50,-114.78],[53.61,-114.40]],{paddingTopLeft:[10,wide?60:90],
+    paddingBottomRight:[wide?410:10, wide?10:Math.round(window.innerHeight*0.56)]});
+}
+fitLake();
+var darkTiles=L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+  maxZoom:18, subdomains:'abcd',
+  attribution:'&copy; OpenStreetMap &copy; CARTO | HRDPS &copy; ECCC via Open-Meteo'
+});
+var satTiles=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
+  maxZoom:19, attribution:'Imagery &copy; Esri, Maxar, Earthstar Geographics | HRDPS &copy; ECCC via Open-Meteo'
+});
+function setBasemap(){ if(S.sat){ darkTiles.remove(); satTiles.addTo(map); } else { satTiles.remove(); darkTiles.addTo(map); } }
+setBasemap();
+map.attributionControl.setPrefix(false);
+L.rectangle([[CFG.latMin,CFG.lonMin],[CFG.latMax,CFG.lonMax]],{color:'#4fc3f7',weight:1,opacity:.35,fill:false,dashArray:'4 4',interactive:false}).addTo(map);
+[['Wabamun',53.5586,-114.4718],['Seba Beach',53.5553,-114.7340]].forEach(function(p){
+  L.circleMarker([p[1],p[2]],{radius:3,color:'#fff',weight:1,fillOpacity:1,interactive:false}).addTo(map)
+   .bindTooltip(p[0],{permanent:true,direction:'right',className:'',opacity:.8});
+});
+var spotMarker=L.marker(S.spot,{icon:L.divIcon({className:'',html:'<div class="spot-icon"></div>',iconSize:[16,16],iconAnchor:[8,8]}),
+  title:'Your spot (tap the map to move)'}).addTo(map);
+
+// Saved spots (from Quickdraw waypoints or "+ Spot") get their own marker.
+// Clicking one just moves the active spot there, same as tapping open water.
+var spotsLayer=L.layerGroup().addTo(map);
+function renderSpotMarkers(){
+  spotsLayer.clearLayers();
+  S.spots.forEach(function(sp){
+    L.marker([sp.lat,sp.lon],{icon:L.divIcon({className:'',html:'<div class="flag-icon"></div>',iconSize:[14,14],iconAnchor:[7,7]}),
+      title:sp.name}).addTo(spotsLayer).on('click',function(){
+        S.spot=[sp.lat,sp.lon]; store('wf.spot',S.spot); spotMarker.setLatLng(S.spot);
+        if(S.data){ recompute(); render(); }
+      });
+  });
+}
+renderSpotMarkers();
+
+map.on('click',function(e){
+  if(S.addMode){
+    var name=(prompt('Name this spot (e.g. "North reef", "Weed edge off the point"):')||'').trim();
+    if(name){
+      S.spots.push({id:uid(), name:name.slice(0,60), lat:round(e.latlng.lat,5), lon:round(e.latlng.lng,5)});
+      store('wf.spots',S.spots); renderSpotMarkers(); if(S.data) render();
+    }
+    S.addMode=false; $('addspotbtn').classList.remove('on'); map.getContainer().style.cursor='';
+    return;
+  }
+  S.spot=[round(e.latlng.lat,4),round(e.latlng.lng,4)]; store('wf.spot',S.spot);
+  spotMarker.setLatLng(S.spot); if(S.data){ recompute(); render(); }
+});
+
+var heat=document.createElement('canvas'), flow=document.createElement('canvas');
+heat.className='fx'; flow.className='fx'; heat.style.opacity='1';
+map.getContainer().appendChild(heat); map.getContainer().appendChild(flow);
+var hctx=heat.getContext('2d'), fctx=flow.getContext('2d'), off=document.createElement('canvas'), octx=off.getContext('2d');
+var W=0,H=0,DPR=1;
+function sizeCanvases(){
+  var sz=map.getSize(); W=sz.x; H=sz.y; DPR=window.devicePixelRatio||1;
+  [heat,flow].forEach(function(c){ c.width=W*DPR; c.height=H*DPR; c.style.width=W+'px'; c.style.height=H+'px'; });
+  hctx.setTransform(DPR,0,0,DPR,0,0); fctx.setTransform(DPR,0,0,DPR,0,0);
+  resetParticles();
+}
+function view(){
+  var b=map.getBounds(); return {n:b.getNorth(),s:b.getSouth(),w:b.getWest(),e:b.getEast()};
+}
+function drawHeat(){
+  hctx.clearRect(0,0,W,H); if(!S.data) return;
+  var L_=LAYERS[S.layer], step=4, cw=Math.ceil(W/step), ch=Math.ceil(H/step), v=view();
+  off.width=cw; off.height=ch; var img=octx.createImageData(cw,ch), px=img.data;
+  for(var y=0;y<ch;y++){
+    var lat=v.n-(y*step+step/2)/H*(v.n-v.s);
+    for(var x=0;x<cw;x++){
+      var lon=v.w+(x*step+step/2)/W*(v.e-v.w), val;
+      if(L_.field==='spd'){ var w=windAt(S.idx,lat,lon); val=w?Math.hypot(w.u,w.v):null; }
+      else val=sample(L_.field,S.idx,lat,lon);
+      if(val==null) continue;
+      var c=ramp(L_.stops,val), o=(y*cw+x)*4;
+      px[o]=c[0]; px[o+1]=c[1]; px[o+2]=c[2]; px[o+3]=c[3]*150;
+    }
+  }
+  octx.putImageData(img,0,0);
+  hctx.imageSmoothingEnabled=true; hctx.drawImage(off,0,0,cw*step,ch*step);
+}
+
+// ---------- wind particles ----------
+var parts=[];
+function resetParticles(){
+  var n=Math.min(2500,Math.round(W*H/350)); parts=[];
+  for(var i=0;i<n;i++) parts.push(spawn({}, true));
+  fctx.clearRect(0,0,W,H);
+}
+function gridRect(){
+  var a=map.latLngToContainerPoint([CFG.latMax,CFG.lonMin]), b=map.latLngToContainerPoint([CFG.latMin,CFG.lonMax]);
+  return {x0:Math.max(0,a.x),y0:Math.max(0,a.y),x1:Math.min(W,b.x),y1:Math.min(H,b.y)};
+}
+var GR={x0:0,y0:0,x1:0,y1:0};
+function spawn(p,init){
+  p.x=GR.x0+Math.random()*Math.max(0,GR.x1-GR.x0); p.y=GR.y0+Math.random()*Math.max(0,GR.y1-GR.y0);
+  p.age=init?Math.floor(Math.random()*90):0; p.max=60+Math.floor(Math.random()*60); return p;
+}
+function frame(){
+  requestAnimationFrame(frame);
+  if(!S.data || !S.flow || document.hidden) return;
+  GR=gridRect();
+  fctx.globalCompositeOperation='destination-in'; fctx.fillStyle='rgba(0,0,0,0.9)'; fctx.fillRect(0,0,W,H);
+  fctx.globalCompositeOperation='source-over';
+  var v=view(), K=0.07;
+  fctx.lineWidth=1.1; fctx.strokeStyle='rgba(255,255,255,0.75)'; fctx.beginPath();
+  for(var i=0;i<parts.length;i++){
+    var p=parts[i];
+    if(++p.age>p.max){ spawn(p); continue; }
+    var lat=v.n-p.y/H*(v.n-v.s), lon=v.w+p.x/W*(v.e-v.w), w=windAt(S.idx,lat,lon);
+    if(!w){ spawn(p); continue; }
+    var nx=p.x+w.u*K, ny=p.y-w.v*K;
+    fctx.moveTo(p.x,p.y); fctx.lineTo(nx,ny); p.x=nx; p.y=ny;
+  }
+  fctx.stroke();
+}
+map.on('move zoom',function(){ fctx.clearRect(0,0,W,H); drawHeat(); });
+map.on('moveend zoomend',function(){ GR=gridRect(); resetParticles(); drawHeat(); });
+map.on('resize',function(){ sizeCanvases(); drawHeat(); });
+
+// ---------- UI ----------
+function buildLayerChips(){
+  var box=$('layers'); box.innerHTML='';
+  Object.keys(LAYERS).forEach(function(k){
+    var b=document.createElement('button'); b.className='chip'+(k===S.layer?' on':''); b.textContent=LAYERS[k].label;
+    b.onclick=function(){ S.layer=k; store('wf.layer',k); buildLayerChips(); drawHeat(); renderLegend(); };
+    box.appendChild(b);
+  });
+}
+function renderLegend(){
+  var L_=LAYERS[S.layer], st=L_.stops;
+  var grad=st.map(function(s,i){ var c=s[1]; return 'rgba('+c.map(function(x,j){return j<3?Math.round(x):Math.max(.15,x);}).join(',')+') '+(i/(st.length-1)*100)+'%'; }).join(',');
+  $('legend').innerHTML='<div>'+L_.label+' ('+L_.unit+')</div><div class="bar" style="background:linear-gradient(90deg,'+grad+')"></div>'+
+    '<div class="ends"><span>'+st[0][0]+'</span><span>'+st[Math.floor(st.length/2)][0]+'</span><span>'+st[st.length-1][0]+'+</span></div>';
+}
+$('ptoggle').onclick=function(){ S.flow=!S.flow; store('wf.flow',S.flow); this.classList.toggle('on',S.flow); fctx.clearRect(0,0,W,H); };
+$('ptoggle').classList.toggle('on',S.flow);
+$('sat').classList.toggle('on',S.sat);
+$('sat').onclick=function(){ S.sat=!S.sat; store('wf.sat',S.sat); setBasemap(); this.classList.toggle('on',S.sat); };
+$('addspotbtn').onclick=function(){
+  S.addMode=!S.addMode; this.classList.toggle('on',S.addMode);
+  map.getContainer().style.cursor=S.addMode?'crosshair':'';
+};
+$('slider').oninput=function(){ setIdx(+this.value); };
+$('play').onclick=function(){
+  if(S.playing){ clearInterval(S.playing); S.playing=null; this.innerHTML='&#9654;'; return; }
+  this.innerHTML='&#10074;&#10074;';
+  S.playing=setInterval(function(){ setIdx((S.idx+1)%S.data.times.length); },800);
+};
+$('refresh').onclick=function(){ load(true); };
+
+function setIdx(i){ S.idx=i; $('slider').value=i; drawHeat(); render(); }
+
+function recompute(){
+  S.astro=buildAstro();
+  S.scores=S.data.times.map(function(_,t){ return scoreHour(t); });
+}
+
+function bestWindows(){
+  var now=Date.now()-3600000, runs=[], cur=null;
+  S.scores.forEach(function(r,t){
+    var ok=r.score>=60 && !r.unsafe && S.data.times[t]>=now;
+    if(ok){ if(!cur) cur={a:t,b:t,sum:0}; cur.b=t; cur.sum+=r.score; }
+    else if(cur){ runs.push(cur); cur=null; }
+  });
+  if(cur) runs.push(cur);
+  runs.forEach(function(r){ r.avg=r.sum/(r.b-r.a+1); });
+  return runs.sort(function(x,y){ return y.avg-x.avg; }).slice(0,3);
+}
+
+function renderStrip(){
+  var st=$('strip'), days=$('days'), T=S.data.times, now=Date.now()-3600000;
+  st.innerHTML=''; days.innerHTML='';
+  S.scores.forEach(function(r,t){
+    var b=document.createElement('div'), rt=rating(r.score);
+    b.className='b'+(t===S.idx?' sel':'')+(T[t]<now?' past':'');
+    b.style.height=Math.max(6,r.score/100*54)+'px'; b.style.background=r.unsafe?'var(--poor)':rt.color;
+    b.title=fmtHour.format(T[t])+' - '+r.score+' '+rt.label;
+    b.onclick=function(){ setIdx(t); };
+    st.appendChild(b);
+    if(localHour(T[t])===0 || (t===0 && localHour(T[t])<18)){
+      var sp=document.createElement('span'); sp.textContent=fmtDay.format(T[t]);
+      sp.style.left=(t/T.length*100)+'%'; days.appendChild(sp);
+    }
+  });
+}
+
+function render(){
+  if(!S.data) return;
+  var T=S.data.times, t=S.idx, r=S.scores[t], s=r.s, rt=rating(r.score);
+  var rel=Math.round((T[t]+1800000-Date.now())/3600000);
+  $('when').textContent=fmtHour.format(T[t])+(rel===0?' (now)':rel>0?' (+'+rel+'h)':' ('+rel+'h)');
+  renderStrip();
+
+  var p0=t>=3?sample('pres',t-3,S.spot[0],S.spot[1]):null, dp=(p0!=null&&s.pres!=null)?s.pres-p0:null;
+  var trend=dp==null?'':dp<=-0.7?' ↓':dp>=0.7?' ↑':' →';
+  var mid=new Date(T[t]+1800000), ill=SunCalc.getMoonIllumination(mid);
+  var dayStart=T[t]-localHour(T[t])*3600000, dayEnd=dayStart+86400000;
+  var sunToday=S.astro.sun.filter(function(e){return e.t>=dayStart&&e.t<dayEnd;});
+  var sr=sunToday.filter(function(e){return e.type==='rise';})[0], ss=sunToday.filter(function(e){return e.type==='set';})[0];
+  var sol;
+  sol=S.astro.moon.filter(function(e){return e.t>=T[t] && e.t<T[t]+86400000;}).slice(0,4)
+    .map(function(e){ var major=e.type==='overhead'||e.type==='underfoot';
+      return '<li>'+fmtHour.format(e.t).split(' ')[0]+' '+fmtTime.format(e.t)+' - moon '+e.type+
+             ' <span style="color:var(--muted)">('+(major?'major, ~2h':'minor, ~1h')+')</span></li>'; });
+
+  var shore=s.dir!=null && s.spd>=8
+    ? '<div class="tip">Wind from the <b>'+dir8word(s.dir)+'</b> is pushing water and baitfish onto the <b>'+dir8word(s.dir+180)+
+      ' shore</b>. Walleye and pike often feed along that wind-blown side.</div>'
+    : '';
+  var warn=r.unsafe ? '<div class="warn">Gusts '+Math.round(s.gust)+' km/h. Wabamun builds big waves fast - not small-boat weather.</div>' : '';
+
+  var best=bestWindows().map(function(w){
+    return '<li><a href="#" data-i="'+w.a+'" style="color:var(--accent)">'+fmtHour.format(T[w.a])+' - '+
+      (fmtDay.format(T[w.a])===fmtDay.format(T[w.b]+3600000)?'':fmtDay.format(T[w.b]+3600000).split(',')[0]+' ')+
+      fmtTime.format(T[w.b]+3600000)+'</a> (avg '+Math.round(w.avg)+')</li>'; }).join('') ||
+    '<li>No Good-or-better windows in this HRDPS run.</li>';
+
+  $('detail').innerHTML=
+    '<div class="score"><div class="big">'+r.score+'</div><div><span class="tag" style="background:'+(r.unsafe?'var(--poor)':rt.color)+'">'+
+      (r.unsafe?'Unsafe':rt.label)+'</span><div class="note" style="margin:4px 0 0">Fishing outlook at your spot ('+
+      S.spot[0].toFixed(3)+', '+S.spot[1].toFixed(3)+')</div></div></div>'+
+    warn+
+    '<div class="grid">'+
+      cell('Wind',s.spd==null?'-':Math.round(s.spd)+' '+dir16(s.dir))+
+      cell('Gusts',fmt(s.gust,0,' km/h'))+
+      cell('Temp',fmt(s.temp,0,'°C'))+
+      cell('Pressure',s.pres==null?'-':Math.round(s.pres)+trend)+
+      cell('Cloud',fmt(s.cloud,0,'%'))+
+      cell('Precip',fmt(s.precip,1,' mm'))+
+    '</div>'+shore+
+    '<h3>Why this score</h3><ul>'+(r.factors.length?r.factors.map(function(x){
+      return '<li><span class="'+(x[0]>=0?'pos':'neg')+'">'+(x[0]>=0?'+':'')+x[0]+'</span> '+x[1]+'</li>'; }).join(''):'<li>Baseline 50</li>')+'</ul>'+
+    '<h3>Best upcoming windows</h3><ul id="best">'+best+'</ul>'+
+    '<h3>Sun &amp; moon</h3><ul>'+
+      '<li>Sunrise '+(sr?fmtTime.format(sr.t):'-')+', sunset '+(ss?fmtTime.format(ss.t):'-')+'</li>'+
+      '<li>'+moonPhaseName(ill.phase)+', '+Math.round(ill.fraction*100)+'% lit</li>'+sol.join('')+'</ul>'+
+    spotsSectionHtml(t)+
+    '<div class="note">Forecast: ECCC HRDPS 2.5 km (48 h), via Open-Meteo. Fetched '+fmtHour.format(S.data.fetchedAt)+' '+
+      fmtTime.format(S.data.fetchedAt)+(S.data.stale?' <b style="color:var(--fair)">(offline copy)</b>':'')+
+      '. The score is a rule-of-thumb guide, not a guarantee. Tap the map to move your spot. '+
+      'Saved spots and catches live in this browser only - export GPX to back them up or move them to another device.</div>';
+
+  Array.prototype.forEach.call(document.querySelectorAll('#best a'),function(a){
+    a.onclick=function(e){ e.preventDefault(); setIdx(+a.getAttribute('data-i')); };
+  });
+  bindSpotsPanel();
+}
+function cell(k,v){ return '<div class="cell"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>'; }
+
+// ---------- Garmin GPX waypoints ----------
+function importGpx(text){
+  var doc=new DOMParser().parseFromString(text,'application/xml');
+  if(doc.querySelector('parsererror')) throw new Error('not a valid GPX/XML file');
+  var wpts=doc.querySelectorAll('wpt'), added=0;
+  Array.prototype.forEach.call(wpts,function(w){
+    var lat=parseFloat(w.getAttribute('lat')), lon=parseFloat(w.getAttribute('lon'));
+    if(!isFinite(lat)||!isFinite(lon)) return;
+    var nameEl=w.querySelector('name'), name=nameEl&&nameEl.textContent?nameEl.textContent.trim():('Spot '+(S.spots.length+added+1));
+    var dup=S.spots.some(function(sp){ return Math.abs(sp.lat-lat)<0.00005 && Math.abs(sp.lon-lon)<0.00005; });
+    if(dup) return;
+    S.spots.push({id:uid(), name:name.slice(0,60), lat:round(lat,5), lon:round(lon,5)});
+    added++;
+  });
+  store('wf.spots',S.spots); renderSpotMarkers(); if(S.data) render();
+  var skipped=wpts.length-added;
+  alert(added+' spot'+(added===1?'':'s')+' imported'+(skipped>0?' ('+skipped+' already on the map).':'.'));
+}
+function exportGpx(){
+  var wpts=S.spots.map(function(sp){
+    return '  <wpt lat="'+sp.lat+'" lon="'+sp.lon+'"><name>'+esc(sp.name)+'</name><sym>Flag, Blue</sym></wpt>';
+  }).join('\n');
+  var xml='<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Wabamun Fishing Weather" '+
+    'xmlns="http://www.topografix.com/GPX/1/1">\n'+wpts+'\n</gpx>\n';
+  var blob=new Blob([xml],{type:'application/gpx+xml'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='wabamun-spots.gpx';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); },2000);
+}
+
+// ---------- My Spots panel ----------
+function spotToolsHtml(){
+  return '<div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">'+
+    '<label class="chip sm" style="cursor:pointer">Import GPX<input type="file" id="gpxfile" accept=".gpx" style="display:none"></label>'+
+    (S.spots.length?'<button class="chip sm" id="exportgpx">Export GPX</button>':'')+
+    '</div>';
+}
+function spotsSectionHtml(t){
+  if(!S.spots.length){
+    return '<h3>My Spots</h3><div class="note">No saved spots yet. Tap "+ Spot" up top, then tap the map - '+
+      'or import the GPX file exported from your Garmin (waypoints, or a Quickdraw track saved as waypoints).</div>'+spotToolsHtml();
+  }
+  var rows=rankedSpots(t).map(function(x){
+    var rt=rating(x.score), sp=x.spot, cc=S.catches.filter(function(c){ return c.spotId===sp.id; });
+    return '<div class="spotrow">'+
+      '<div class="spotmain">'+
+        '<span class="tag sm" style="background:'+(x.unsafe?'var(--poor)':rt.color)+'">'+x.score+'</span>'+
+        '<span class="spotname">'+esc(sp.name)+'</span>'+
+        (cc.length?'<span class="note" style="margin-left:2px">'+cc.length+' catch'+(cc.length>1?'es':'')+'</span>':'')+
+      '</div>'+
+      '<div class="spotbtns">'+
+        '<button class="chip sm" data-focus="'+sp.id+'">Focus</button>'+
+        '<button class="chip sm" data-catch="'+sp.id+'">Log catch</button>'+
+        '<button class="chip sm" data-delspot="'+sp.id+'">Delete</button>'+
+      '</div></div>';
+  }).join('');
+  return '<h3>My Spots (ranked for this hour)</h3>'+rows+spotToolsHtml();
+}
+function bindSpotsPanel(){
+  Array.prototype.forEach.call(document.querySelectorAll('[data-focus]'),function(b){
+    b.onclick=function(){
+      var sp=S.spots.find(function(x){ return x.id===b.getAttribute('data-focus'); });
+      if(sp){ S.spot=[sp.lat,sp.lon]; store('wf.spot',S.spot); spotMarker.setLatLng(S.spot); recompute(); render(); }
+    };
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-catch]'),function(b){
+    b.onclick=function(){
+      var id=b.getAttribute('data-catch'), sp=S.spots.find(function(x){ return x.id===id; }); if(!sp) return;
+      var species=(prompt('Species caught (e.g. Walleye, Pike, Perch):')||'').trim(); if(!species) return;
+      var size=(prompt('Size, optional (e.g. 45cm) - leave blank to skip:')||'').trim();
+      var r=scoreHour(S.idx,sp.lat,sp.lon);
+      S.catches.push({id:uid(), spotId:id, ts:Date.now(), species:species, size:size,
+        snapshot:{score:r.score, spd:r.s.spd, dir:r.s.dir, gust:r.s.gust, temp:r.s.temp, pres:r.s.pres, cloud:r.s.cloud, precip:r.s.precip}});
+      store('wf.catches',S.catches); render();
+    };
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-delspot]'),function(b){
+    b.onclick=function(){
+      var id=b.getAttribute('data-delspot');
+      if(!confirm('Delete this spot and its catch log? This cannot be undone.')) return;
+      S.spots=S.spots.filter(function(x){ return x.id!==id; });
+      S.catches=S.catches.filter(function(c){ return c.spotId!==id; });
+      store('wf.spots',S.spots); store('wf.catches',S.catches); renderSpotMarkers(); render();
+    };
+  });
+  var gpxFile=$('gpxfile');
+  if(gpxFile) gpxFile.onchange=function(){
+    var file=this.files[0]; if(!file) return;
+    var reader=new FileReader();
+    reader.onload=function(){
+      try{ importGpx(reader.result); }catch(e){ alert('Could not read that GPX file: '+(e.message||e)); }
+      gpxFile.value='';
+    };
+    reader.readAsText(file);
+  };
+  var exportBtn=$('exportgpx'); if(exportBtn) exportBtn.onclick=exportGpx;
+}
+
+// ---------- boot ----------
+function useData(D){
+  var keep=S.data?S.data.times[S.idx]:null;
+  S.data=D; recompute();
+  var now=Date.now(), i=0; while(i<D.times.length-1 && D.times[i]+3600000<=now) i++;
+  if(keep!=null && D.times.indexOf(keep)>=0) i=D.times.indexOf(keep);
+  $('slider').max=D.times.length-1; S.idx=i; $('slider').value=i;
+  $('status').textContent=''; drawHeat(); render();
+}
+function load(manual){
+  $('status').textContent=manual?'Refreshing HRDPS forecast...':'Loading HRDPS forecast...';
+  fetchForecast().then(function(raw){
+    var D=buildData(raw,Date.now()); store('wf.cache',{raw:raw,at:D.fetchedAt}); useData(D);
+  }).catch(function(err){
+    var c=store('wf.cache');
+    if(c && c.raw){ try{ var D=buildData(c.raw,c.at); D.stale=true; useData(D); return; }catch(e){} }
+    $('status').innerHTML='Could not load the forecast.<br><small>'+String(err.message||err).replace(/</g,'&lt;')+
+      '</small><br><br><button class="chip on" onclick="location.reload()">Try again</button>';
+  });
+}
+
+buildLayerChips(); renderLegend(); sizeCanvases(); GR=gridRect();
+requestAnimationFrame(frame);
+load(false);
+setInterval(function(){ if(!document.hidden) load(false); }, 30*60000);
+})();
+</script>
+</body>
+</html>
