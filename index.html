@@ -151,6 +151,7 @@ var LAYERS = {
 function $(id){ return document.getElementById(id); }
 function store(k,v){ try{ if(v===undefined) return JSON.parse(localStorage.getItem(k)); localStorage.setItem(k,JSON.stringify(v)); }catch(e){ return null; } }
 function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+function inGrid(lat,lon){ return lat>=CFG.latMin && lat<=CFG.latMax && lon>=CFG.lonMin && lon<=CFG.lonMax; }
 function round(v,d){ if(v==null) return null; var m=Math.pow(10,d||0); return Math.round(v*m)/m; }
 function fmt(v,d,u){ return v==null ? '-' : round(v,d)+(u||''); }
 var DIR16 = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
@@ -362,9 +363,14 @@ function fitLake(){
     paddingBottomRight:[wide?410:10, wide?10:Math.round(window.innerHeight*0.56)]});
 }
 fitLake();
-var darkTiles=L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
-  maxZoom:18, subdomains:'abcd',
-  attribution:'&copy; OpenStreetMap &copy; CARTO | HRDPS &copy; ECCC via Open-Meteo'
+// Plain OpenStreetMap tiles, inverted with a CSS filter for a dark look.
+// (CARTO's own dark_all tiles started demanding an API key we don't have;
+// raw OSM raster tiles are the one source that has never required one.)
+map.createPane('base');
+map.getPane('base').style.filter='invert(1) hue-rotate(180deg) brightness(.94) contrast(.92) saturate(.65)';
+var darkTiles=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
+  maxZoom:19, pane:'base',
+  attribution:'&copy; OpenStreetMap contributors | HRDPS &copy; ECCC via Open-Meteo'
 });
 var satTiles=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
   maxZoom:19, attribution:'Imagery &copy; Esri, Maxar, Earthstar Geographics | HRDPS &copy; ECCC via Open-Meteo'
@@ -566,6 +572,9 @@ function render(){
       return '<li>'+fmtHour.format(e.t).split(' ')[0]+' '+fmtTime.format(e.t)+' - moon '+e.type+
              ' <span style="color:var(--muted)">('+(major?'major, ~2h':'minor, ~1h')+')</span></li>'; });
 
+  var outside = !inGrid(S.spot[0],S.spot[1]);
+  var oob = outside ? '<div class="warn">This point is outside the HRDPS forecast area (the dashed box on the map) - '+
+    'wind, temp and the rest can\'t be shown here. Tap closer to Wabamun Lake, or use the "Focus" button on a saved spot.</div>' : '';
   var shore=s.dir!=null && s.spd>=8
     ? '<div class="tip">Wind from the <b>'+dir8word(s.dir)+'</b> is pushing water and baitfish onto the <b>'+dir8word(s.dir+180)+
       ' shore</b>. Walleye and pike often feed along that wind-blown side.</div>'
@@ -582,7 +591,7 @@ function render(){
     '<div class="score"><div class="big">'+r.score+'</div><div><span class="tag" style="background:'+(r.unsafe?'var(--poor)':rt.color)+'">'+
       (r.unsafe?'Unsafe':rt.label)+'</span><div class="note" style="margin:4px 0 0">Fishing outlook at your spot ('+
       S.spot[0].toFixed(3)+', '+S.spot[1].toFixed(3)+')</div></div></div>'+
-    warn+
+    oob+warn+
     '<div class="grid">'+
       cell('Wind',s.spd==null?'-':Math.round(s.spd)+' '+dir16(s.dir))+
       cell('Gusts',fmt(s.gust,0,' km/h'))+
