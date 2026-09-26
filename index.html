@@ -73,6 +73,8 @@ li{margin:2px 0}
 #status:empty{display:none}
 .spot-icon{width:16px;height:16px;border-radius:50%;background:var(--accent);border:3px solid #fff;box-shadow:0 0 0 2px rgba(0,0,0,.4)}
 .flag-icon{width:12px;height:12px;background:#ffb703;border:2px solid #06121b;transform:rotate(45deg);box-shadow:0 0 0 1px rgba(255,255,255,.7)}
+.launch-icon{width:13px;height:13px;background:#2ea0ff;border:2px solid #06121b;border-radius:3px;box-shadow:0 0 0 1px rgba(255,255,255,.7)}
+.route-label{background:rgba(15,23,32,.85);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:10px;white-space:nowrap}
 .spotrow{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
 .spotrow:last-of-type{border-bottom:0}
 .spotmain{display:flex;align-items:center;gap:6px;min-width:0}
@@ -96,6 +98,8 @@ li{margin:2px 0}
   <button class="chip" id="sat" title="Satellite imagery">Sat</button>
   <button class="chip" id="radar" title="Live rain radar (RainViewer)">Radar</button>
   <button class="chip" id="addspotbtn" title="Tap the map to drop a saved spot">+ Spot</button>
+  <button class="chip" id="addlaunchbtn" title="Tap the map to mark a boat launch">+ Launch</button>
+  <button class="chip" id="routes" title="Straight-line routes from your nearest launch to your best spots">Routes</button>
   <button class="chip" id="refresh" title="Fetch the latest HRDPS run">Refresh</button>
 </div>
 
@@ -122,9 +126,24 @@ li{margin:2px 0}
 
 // ---------- config ----------
 var CFG = {
-  // HRDPS sampling grid over Wabamun Lake and its shores (about 4 km spacing;
-  // HRDPS itself is 2.5 km, so every sample is a real model cell).
-  latMin:53.46, latMax:53.64, lonMin:-114.86, lonMax:-114.34, rows:7, cols:9,
+  // HRDPS sampling grids, one box per lake, each sampled at its own density
+  // (HRDPS itself is 2.5 km, so anything this fine is real model detail, not
+  // invented resolution). Wabamun's box is confirmed against the real HRDPS
+  // feed. Lake Isle's and Spring Lake's centers are placed from memory, not
+  // looked up - their boxes are padded wider than Wabamun's on purpose to
+  // hedge that, and each is drawn as a dashed rectangle with a label on the
+  // map, so a wrong placement is obvious at a glance rather than silent.
+  regions:[
+    { id:'wabamun', name:'Wabamun Lake', center:[53.548,-114.60],
+      latMin:53.46, latMax:53.64, lonMin:-114.86, lonMax:-114.34, rows:7, cols:9,
+      labels:[['Wabamun',53.5586,-114.4718],['Seba Beach',53.5553,-114.7340]] },
+    { id:'lakeisle', name:'Lake Isle', center:[53.67,-115.20],
+      latMin:53.58, latMax:53.76, lonMin:-115.38, lonMax:-115.02, rows:6, cols:7,
+      labels:[['Lake Isle',53.67,-115.20]] },
+    { id:'springlake', name:'Spring Lake', center:[53.58,-114.02],
+      latMin:53.50, latMax:53.66, lonMin:-114.14, lonMax:-113.90, rows:5, cols:5,
+      labels:[['Spring Lake',53.58,-114.02]] }
+  ],
   defaultSpot:[53.548,-114.60],
   tz:'America/Edmonton',
   hours:48, past:3,
@@ -152,7 +171,20 @@ var LAYERS = {
 function $(id){ return document.getElementById(id); }
 function store(k,v){ try{ if(v===undefined) return JSON.parse(localStorage.getItem(k)); localStorage.setItem(k,JSON.stringify(v)); }catch(e){ return null; } }
 function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
-function inGrid(lat,lon){ return lat>=CFG.latMin && lat<=CFG.latMax && lon>=CFG.lonMin && lon<=CFG.lonMax; }
+// Great-circle distance in km - what a straight route across open water
+// actually is, since there's no road network to route along out there.
+function haversineKm(lat1,lon1,lat2,lon2){
+  var R=6371, rad=Math.PI/180;
+  var dLat=(lat2-lat1)*rad, dLon=(lon2-lon1)*rad;
+  var a=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(lat1*rad)*Math.cos(lat2*rad)*Math.sin(dLon/2)*Math.sin(dLon/2);
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+function regionAt(lat,lon){
+  for(var i=0;i<CFG.regions.length;i++){ var r=CFG.regions[i];
+    if(lat>=r.latMin && lat<=r.latMax && lon>=r.lonMin && lon<=r.lonMax) return r; }
+  return null;
+}
+function inGrid(lat,lon){ return regionAt(lat,lon)!=null; }
 function round(v,d){ if(v==null) return null; var m=Math.pow(10,d||0); return Math.round(v*m)/m; }
 function fmt(v,d,u){ return v==null ? '-' : round(v,d)+(u||''); }
 var DIR16 = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
@@ -183,17 +215,28 @@ var S = { data:null, idx:0, layer:store('wf.layer')||'wind', flow:store('wf.flow
           spots:store('wf.spots')||[], catches:store('wf.catches')||[],
           sat:store('wf.sat')||false, addMode:false,
           radarOn:store('wf.radar')||false, radarTime:null,
-          alerts:null, alertsFailed:false };
+          alerts:null, alertsFailed:false,
+          launches:store('wf.launches')||[], launchMode:false, routesOn:store('wf.routes')||false };
 if(!LAYERS[S.layer]) S.layer='wind';
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 function esc(v){ return String(v).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
 
 // ---------- data ----------
+// Flattens every region's own rows x cols grid into one point list, region
+// by region, in order - buildData() slices the API response back apart
+// using each region's offset/size in that same order.
 function gridPoints(){
   var pts=[];
-  for(var r=0;r<CFG.rows;r++) for(var c=0;c<CFG.cols;c++)
-    pts.push([CFG.latMin+r*(CFG.latMax-CFG.latMin)/(CFG.rows-1), CFG.lonMin+c*(CFG.lonMax-CFG.lonMin)/(CFG.cols-1)]);
+  CFG.regions.forEach(function(rg){
+    for(var r=0;r<rg.rows;r++) for(var c=0;c<rg.cols;c++)
+      pts.push([rg.latMin+r*(rg.latMax-rg.latMin)/(rg.rows-1), rg.lonMin+c*(rg.lonMax-rg.lonMin)/(rg.cols-1)]);
+  });
   return pts;
+}
+function regionOffsets(){
+  var off=0, out=[];
+  CFG.regions.forEach(function(rg){ var n=rg.rows*rg.cols; out.push({region:rg,offset:off,n:n}); off+=n; });
+  return out;
 }
 
 function fetchForecast(){
@@ -212,7 +255,7 @@ function fetchForecast(){
 // Turn the per-point API response into per-hour flat fields, and trim hours
 // the HRDPS run does not cover (it only goes out 48 h).
 function buildData(raw, fetchedAt){
-  var n=CFG.rows*CFG.cols;
+  var n=CFG.regions.reduce(function(sum,rg){ return sum+rg.rows*rg.cols; },0);
   if(raw.length!==n) throw new Error('Expected '+n+' grid points, got '+raw.length);
   var times=raw[0].hourly.time, T=times.length;
   var f={spd:[],dir:[],gust:[],temp:[],pres:[],cloud:[],precip:[],u:[],v:[]};
@@ -234,15 +277,22 @@ function buildData(raw, fetchedAt){
   return out;
 }
 
-// Bilinear sample of a field at hour t. Returns null outside the grid.
+// Bilinear sample of a field at hour t. Finds which region's grid the point
+// falls in first (each region is sampled independently, so Wabamun's density
+// doesn't get diluted by the wider gaps between lakes), then interpolates
+// within just that region's slice of the flat array. Null outside every grid.
+var REGION_OFFSETS=null;
 function sample(field,t,lat,lon){
   var D=S.data; if(!D || !D[field] || !D[field][t]) return null;
-  var fx=(lon-CFG.lonMin)/(CFG.lonMax-CFG.lonMin)*(CFG.cols-1);
-  var fy=(lat-CFG.latMin)/(CFG.latMax-CFG.latMin)*(CFG.rows-1);
-  if(fx<0||fy<0||fx>CFG.cols-1||fy>CFG.rows-1) return null;
-  var c0=Math.min(Math.floor(fx),CFG.cols-2), r0=Math.min(Math.floor(fy),CFG.rows-2), tx=fx-c0, ty=fy-r0;
-  var g=D[field][t], C=CFG.cols;
-  var q=[g[r0*C+c0],g[r0*C+c0+1],g[(r0+1)*C+c0],g[(r0+1)*C+c0+1]], w=[(1-tx)*(1-ty),tx*(1-ty),(1-tx)*ty,tx*ty];
+  var rg=regionAt(lat,lon); if(!rg) return null;
+  if(!REGION_OFFSETS) REGION_OFFSETS=regionOffsets();
+  var ro=REGION_OFFSETS.filter(function(x){ return x.region===rg; })[0]; if(!ro) return null;
+  var fx=(lon-rg.lonMin)/(rg.lonMax-rg.lonMin)*(rg.cols-1);
+  var fy=(lat-rg.latMin)/(rg.latMax-rg.latMin)*(rg.rows-1);
+  if(fx<0||fy<0||fx>rg.cols-1||fy>rg.rows-1) return null;
+  var c0=Math.min(Math.floor(fx),rg.cols-2), r0=Math.min(Math.floor(fy),rg.rows-2), tx=fx-c0, ty=fy-r0;
+  var g=D[field][t], C=rg.cols, base=ro.offset;
+  var q=[g[base+r0*C+c0],g[base+r0*C+c0+1],g[base+(r0+1)*C+c0],g[base+(r0+1)*C+c0+1]], w=[(1-tx)*(1-ty),tx*(1-ty),(1-tx)*ty,tx*ty];
   var sum=0,ws=0; for(var i=0;i<4;i++) if(q[i]!=null){ sum+=q[i]*w[i]; ws+=w[i]; }
   return ws>0.25 ? sum/ws : null;
 }
@@ -365,13 +415,15 @@ var map=L.map('map',{zoomControl:false,attributionControl:true});
 // touched the map themselves. Once they pan or zoom, autoView goes stale
 // and this stops overriding them.
 var autoView=null;
+var HOME_LAKE=CFG.regions[0]; // Wabamun - opens here by default; the other lakes are a pan/jump away.
 function fitLake(){
-  var wide=window.innerWidth>=900;
-  map.fitBounds([[53.50,-114.78],[53.61,-114.40]],{animate:false,paddingTopLeft:[10,wide?60:90],
+  var wide=window.innerWidth>=900, r=HOME_LAKE;
+  map.fitBounds([[r.latMin-0.04,r.lonMin-0.04],[r.latMax+0.03,r.lonMax+0.06]],{animate:false,paddingTopLeft:[10,wide?60:90],
     paddingBottomRight:[wide?410:10, wide?10:Math.round(window.innerHeight*0.56)]});
   autoView={center:map.getCenter(),zoom:map.getZoom()};
 }
 fitLake();
+function goToRegion(rg){ map.flyTo(rg.center, 12, {duration:.6}); }
 var resizeTimer=null;
 window.addEventListener('resize',function(){
   clearTimeout(resizeTimer);
@@ -397,10 +449,12 @@ var satTiles=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/W
 function setBasemap(){ if(S.sat){ darkTiles.remove(); satTiles.addTo(map); } else { satTiles.remove(); darkTiles.addTo(map); } }
 setBasemap();
 map.attributionControl.setPrefix(false);
-L.rectangle([[CFG.latMin,CFG.lonMin],[CFG.latMax,CFG.lonMax]],{color:'#4fc3f7',weight:1,opacity:.35,fill:false,dashArray:'4 4',interactive:false}).addTo(map);
-[['Wabamun',53.5586,-114.4718],['Seba Beach',53.5553,-114.7340]].forEach(function(p){
-  L.circleMarker([p[1],p[2]],{radius:3,color:'#fff',weight:1,fillOpacity:1,interactive:false}).addTo(map)
-   .bindTooltip(p[0],{permanent:true,direction:'right',className:'',opacity:.8});
+CFG.regions.forEach(function(rg){
+  L.rectangle([[rg.latMin,rg.lonMin],[rg.latMax,rg.lonMax]],{color:'#4fc3f7',weight:1,opacity:.35,fill:false,dashArray:'4 4',interactive:false}).addTo(map);
+  rg.labels.forEach(function(p){
+    L.circleMarker([p[1],p[2]],{radius:3,color:'#fff',weight:1,fillOpacity:1,interactive:false}).addTo(map)
+     .bindTooltip(p[0],{permanent:true,direction:'right',className:'',opacity:.8});
+  });
 });
 var spotMarker=L.marker(S.spot,{icon:L.divIcon({className:'',html:'<div class="spot-icon"></div>',iconSize:[16,16],iconAnchor:[8,8]}),
   title:'Your spot (tap the map to move)'}).addTo(map);
@@ -420,6 +474,42 @@ function renderSpotMarkers(){
 }
 renderSpotMarkers();
 
+// Boat launches - a different marker from a saved fishing spot, since a
+// launch is where a route *starts*, not a place to fish.
+var launchesLayer=L.layerGroup().addTo(map);
+function renderLaunchMarkers(){
+  launchesLayer.clearLayers();
+  S.launches.forEach(function(lp){
+    L.marker([lp.lat,lp.lon],{icon:L.divIcon({className:'',html:'<div class="launch-icon"></div>',iconSize:[13,13],iconAnchor:[6,6]}),
+      title:lp.name+' (launch)'}).addTo(launchesLayer).on('click',function(){
+        S.spot=[lp.lat,lp.lon]; store('wf.spot',S.spot); spotMarker.setLatLng(S.spot);
+        if(S.data){ recompute(); render(); }
+      });
+  });
+}
+renderLaunchMarkers();
+
+// Straight-line routes from the nearest launch to the top ranked spots for
+// the selected hour. A boat doesn't follow roads, so a great-circle line
+// and its distance is the honest answer, not a driving-directions guess.
+var routesLayer=L.layerGroup().addTo(map);
+function renderRoutes(t){
+  routesLayer.clearLayers();
+  if(!S.routesOn || !S.launches.length || !S.spots.length || !S.data) return;
+  rankedSpots(t).filter(function(x){ return !x.unsafe; }).slice(0,3).forEach(function(x){
+    var sp=x.spot, nearest=null, best=Infinity;
+    S.launches.forEach(function(lp){
+      var d=haversineKm(lp.lat,lp.lon,sp.lat,sp.lon); if(d<best){ best=d; nearest=lp; }
+    });
+    if(!nearest) return;
+    var line=L.polyline([[nearest.lat,nearest.lon],[sp.lat,sp.lon]],
+      {color:'#4fc3f7', weight:2, opacity:.8, dashArray:'6 5', interactive:false}).addTo(routesLayer);
+    var mid=[(nearest.lat+sp.lat)/2,(nearest.lon+sp.lon)/2];
+    L.marker(mid,{icon:L.divIcon({className:'',html:'<div class="route-label">'+round(best,1)+' km</div>',
+      iconSize:[50,16],iconAnchor:[25,8]}),interactive:false}).addTo(routesLayer);
+  });
+}
+
 map.on('click',function(e){
   if(S.addMode){
     var name=(prompt('Name this spot (e.g. "North reef", "Weed edge off the point"):')||'').trim();
@@ -428,6 +518,15 @@ map.on('click',function(e){
       store('wf.spots',S.spots); renderSpotMarkers(); if(S.data) render();
     }
     S.addMode=false; $('addspotbtn').classList.remove('on'); map.getContainer().style.cursor='';
+    return;
+  }
+  if(S.launchMode){
+    var lname=(prompt('Name this launch (e.g. "Public boat launch", "Seba Beach ramp"):')||'').trim();
+    if(lname){
+      S.launches.push({id:uid(), name:lname.slice(0,60), lat:round(e.latlng.lat,5), lon:round(e.latlng.lng,5)});
+      store('wf.launches',S.launches); renderLaunchMarkers(); if(S.data) render();
+    }
+    S.launchMode=false; $('addlaunchbtn').classList.remove('on'); map.getContainer().style.cursor='';
     return;
   }
   S.spot=[round(e.latlng.lat,4),round(e.latlng.lng,4)]; store('wf.spot',S.spot);
@@ -474,8 +573,19 @@ function resetParticles(){
   for(var i=0;i<n;i++) parts.push(spawn({}, true));
   fctx.clearRect(0,0,W,H);
 }
+// Union of every region's box - wherever the map is panned to (Wabamun,
+// Lake Isle or Spring Lake), particles only spawn inside a real sampled area.
+function allRegionsBounds(){
+  var latMin=Infinity,latMax=-Infinity,lonMin=Infinity,lonMax=-Infinity;
+  CFG.regions.forEach(function(rg){
+    latMin=Math.min(latMin,rg.latMin); latMax=Math.max(latMax,rg.latMax);
+    lonMin=Math.min(lonMin,rg.lonMin); lonMax=Math.max(lonMax,rg.lonMax);
+  });
+  return {latMin:latMin,latMax:latMax,lonMin:lonMin,lonMax:lonMax};
+}
 function gridRect(){
-  var a=map.latLngToContainerPoint([CFG.latMax,CFG.lonMin]), b=map.latLngToContainerPoint([CFG.latMin,CFG.lonMax]);
+  var b0=allRegionsBounds();
+  var a=map.latLngToContainerPoint([b0.latMax,b0.lonMin]), b=map.latLngToContainerPoint([b0.latMin,b0.lonMax]);
   return {x0:Math.max(0,a.x),y0:Math.max(0,a.y),x1:Math.min(W,b.x),y1:Math.min(H,b.y)};
 }
 var GR={x0:0,y0:0,x1:0,y1:0};
@@ -562,6 +672,15 @@ $('addspotbtn').onclick=function(){
   S.addMode=!S.addMode; this.classList.toggle('on',S.addMode);
   map.getContainer().style.cursor=S.addMode?'crosshair':'';
 };
+$('addlaunchbtn').onclick=function(){
+  S.launchMode=!S.launchMode; this.classList.toggle('on',S.launchMode);
+  map.getContainer().style.cursor=S.launchMode?'crosshair':'';
+};
+$('routes').classList.toggle('on',S.routesOn);
+$('routes').onclick=function(){
+  S.routesOn=!S.routesOn; store('wf.routes',S.routesOn); this.classList.toggle('on',S.routesOn);
+  renderRoutes(S.idx);
+};
 $('slider').oninput=function(){ setIdx(+this.value); };
 $('play').onclick=function(){
   if(S.playing){ clearInterval(S.playing); S.playing=null; this.innerHTML='&#9654;'; return; }
@@ -570,7 +689,7 @@ $('play').onclick=function(){
 };
 $('refresh').onclick=function(){ load(true); };
 
-function setIdx(i){ S.idx=i; $('slider').value=i; drawHeat(); render(); }
+function setIdx(i){ S.idx=i; $('slider').value=i; drawHeat(); render(); renderRoutes(i); }
 
 function recompute(){
   S.astro=buildAstro();
@@ -612,6 +731,7 @@ function render(){
   var rel=Math.round((T[t]+1800000-Date.now())/3600000);
   $('when').textContent=fmtHour.format(T[t])+(rel===0?' (now)':rel>0?' (+'+rel+'h)':' ('+rel+'h)');
   renderStrip();
+  renderRoutes(t);
 
   var p0=t>=3?sample('pres',t-3,S.spot[0],S.spot[1]):null, dp=(p0!=null&&s.pres!=null)?s.pres-p0:null;
   var trend=dp==null?'':dp<=-0.7?' ↓':dp>=0.7?' ↑':' →';
@@ -626,8 +746,9 @@ function render(){
              ' <span style="color:var(--muted)">('+(major?'major, ~2h':'minor, ~1h')+')</span></li>'; });
 
   var outside = !inGrid(S.spot[0],S.spot[1]);
-  var oob = outside ? '<div class="warn">This point is outside the HRDPS forecast area (the dashed box on the map) - '+
-    'wind, temp and the rest can\'t be shown here. Tap closer to Wabamun Lake, or use the "Focus" button on a saved spot.</div>' : '';
+  var oob = outside ? '<div class="warn">This point is outside the HRDPS forecast area (a dashed box on the map) - '+
+    'wind, temp and the rest can\'t be shown here. Tap inside one of the dashed boxes (Wabamun, Lake Isle or Spring Lake), '+
+    'or use "Focus" on a saved spot or lake below.</div>' : '';
   var shore=s.dir!=null && s.spd>=8
     ? '<div class="tip">Wind from the <b>'+dir8word(s.dir)+'</b> is pushing water and baitfish onto the <b>'+dir8word(s.dir+180)+
       ' shore</b>. Walleye and pike often feed along that wind-blown side.</div>'
@@ -660,7 +781,9 @@ function render(){
     '<h3>Sun &amp; moon</h3><ul>'+
       '<li>Sunrise '+(sr?fmtTime.format(sr.t):'-')+', sunset '+(ss?fmtTime.format(ss.t):'-')+'</li>'+
       '<li>'+moonPhaseName(ill.phase)+', '+Math.round(ill.fraction*100)+'% lit</li>'+sol.join('')+'</ul>'+
+    lakesSectionHtml(t)+
     spotsSectionHtml(t)+
+    launchesSectionHtml()+
     '<div class="note">Forecast: ECCC HRDPS 2.5 km (48 h), via Open-Meteo. Fetched '+fmtHour.format(S.data.fetchedAt)+' '+
       fmtTime.format(S.data.fetchedAt)+(S.data.stale?' <b style="color:var(--fair)">(offline copy)</b>':'')+
       '. The score is a rule-of-thumb guide, not a guarantee. Tap the map to move your spot. '+
@@ -680,7 +803,7 @@ function cell(k,v){ return '<div class="cell"><div class="k">'+k+'</div><div cla
 // the part you can rely on.
 var ALERTS_LINK='https://weather.gc.ca/warnings/index_e.html?prov=ab';
 function fetchAlerts(){
-  var bbox=[CFG.lonMin,CFG.latMin,CFG.lonMax,CFG.latMax].join(',');
+  var b0=allRegionsBounds(), bbox=[b0.lonMin,b0.latMin,b0.lonMax,b0.latMax].join(',');
   fetch('https://api.weather.gc.ca/collections/alerts/items?bbox='+bbox+'&f=json&limit=50')
     .then(function(r){ if(!r.ok) throw new Error(String(r.status)); return r.json(); })
     .then(function(j){ S.alerts=(j&&j.features)||[]; S.alertsFailed=false; if(S.data) render(); })
@@ -739,6 +862,34 @@ function spotToolsHtml(){
     (S.spots.length?'<button class="chip sm" id="exportgpx">Export GPX</button>':'')+
     '</div>';
 }
+// Ranks the three known lakes by the same score, using each lake's own
+// center as the sample point - a "Focus" here jumps the map and the active
+// spot both, so the score panel above starts describing that lake.
+function lakesSectionHtml(t){
+  var rows=CFG.regions.map(function(rg){
+    var r=scoreHour(t,rg.center[0],rg.center[1]);
+    return {rg:rg, score:r.score, unsafe:r.unsafe};
+  }).sort(function(a,b){ return b.score-a.score; }).map(function(x){
+    var rt=rating(x.score);
+    return '<div class="spotrow"><div class="spotmain">'+
+      '<span class="tag sm" style="background:'+(x.unsafe?'var(--poor)':rt.color)+'">'+x.score+'</span>'+
+      '<span class="spotname">'+esc(x.rg.name)+'</span></div>'+
+      '<div class="spotbtns"><button class="chip sm" data-golake="'+x.rg.id+'">Focus</button></div></div>';
+  }).join('');
+  return '<h3>Nearby Lakes (ranked for this hour)</h3>'+rows;
+}
+function launchesSectionHtml(){
+  if(!S.launches.length){
+    return '<h3>Boat Launches</h3><div class="note">No launches marked yet. Tap "+ Launch" up top, then tap the map - '+
+      'once you have a launch and at least one saved spot, turn on "Routes" for a straight line and distance from '+
+      'the nearest launch to your best spots.</div>';
+  }
+  var rows=S.launches.map(function(lp){
+    return '<div class="spotrow"><div class="spotmain"><span class="spotname">&#9875; '+esc(lp.name)+'</span></div>'+
+      '<div class="spotbtns"><button class="chip sm" data-dellaunch="'+lp.id+'">Delete</button></div></div>';
+  }).join('');
+  return '<h3>Boat Launches</h3>'+rows;
+}
 function spotsSectionHtml(t){
   if(!S.spots.length){
     return '<h3>My Spots</h3><div class="note">No saved spots yet. Tap "+ Spot" up top, then tap the map - '+
@@ -761,6 +912,21 @@ function spotsSectionHtml(t){
   return '<h3>My Spots (ranked for this hour)</h3>'+rows+spotToolsHtml();
 }
 function bindSpotsPanel(){
+  Array.prototype.forEach.call(document.querySelectorAll('[data-golake]'),function(b){
+    b.onclick=function(){
+      var rg=CFG.regions.filter(function(x){ return x.id===b.getAttribute('data-golake'); })[0]; if(!rg) return;
+      S.spot=[rg.center[0],rg.center[1]]; store('wf.spot',S.spot); spotMarker.setLatLng(S.spot);
+      goToRegion(rg); recompute(); render();
+    };
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-dellaunch]'),function(b){
+    b.onclick=function(){
+      var id=b.getAttribute('data-dellaunch');
+      if(!confirm('Delete this launch?')) return;
+      S.launches=S.launches.filter(function(x){ return x.id!==id; });
+      store('wf.launches',S.launches); renderLaunchMarkers(); render();
+    };
+  });
   Array.prototype.forEach.call(document.querySelectorAll('[data-focus]'),function(b){
     b.onclick=function(){
       var sp=S.spots.find(function(x){ return x.id===b.getAttribute('data-focus'); });
