@@ -133,14 +133,19 @@ li{margin:2px 0}
 
 // ---------- config ----------
 var CFG = {
-  // HRDPS sampling grid(s) - kept as a list of regions even with just one,
-  // since the rest of the app (sampling, map boxes, routes) is built to
-  // handle any number of them. Back to Wabamun only; Lake Isle and Spring
-  // Lake were dropped at the user's request.
+  // HRDPS sampling grid(s), one box per lake. Wabamun's box is confirmed
+  // against the real HRDPS feed. Pigeon Lake is a real, well-known lake -
+  // higher confidence than the earlier Lake Isle/Spring Lake guesses - but
+  // still placed from memory, not looked up, so its box is padded wide and
+  // drawn as a dashed rectangle with a label: check it lands on the actual
+  // lake once this is pulled, and say so if it's off.
   regions:[
     { id:'wabamun', name:'Wabamun Lake', center:[53.548,-114.60],
       latMin:53.46, latMax:53.64, lonMin:-114.86, lonMax:-114.34, rows:7, cols:9,
-      labels:[['Wabamun',53.5586,-114.4718],['Seba Beach',53.5553,-114.7340]] }
+      labels:[['Wabamun',53.5586,-114.4718],['Seba Beach',53.5553,-114.7340]] },
+    { id:'pigeonlake', name:'Pigeon Lake', center:[53.03,-114.03],
+      latMin:52.94, latMax:53.12, lonMin:-114.16, lonMax:-113.88, rows:7, cols:8,
+      labels:[['Pigeon Lake',53.03,-114.03],['Ma-Me-O Beach',52.9928,-114.0233]] }
   ],
   defaultSpot:[53.548,-114.60],
   tz:'America/Edmonton',
