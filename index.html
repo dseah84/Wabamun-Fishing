@@ -65,6 +65,8 @@ li{margin:2px 0}
   border-radius:8px;padding:7px 10px;margin:8px 0;cursor:pointer}
 .watertemp .v{font-weight:600}
 .watertemp .k{color:var(--muted);font-size:12px}
+.sel{flex:1;min-width:0;background:rgba(15,23,32,.9);color:var(--ink);border:1px solid var(--line);
+  border-radius:8px;padding:4px 6px;font:inherit}
 .species{margin:6px 0 12px}
 .species .sphead{display:flex;align-items:center;gap:8px;font-weight:600;margin-bottom:2px}
 .species .splures{color:var(--muted);font-size:12px}
@@ -212,16 +214,31 @@ function ramp(stops,v){
   return stops[stops.length-1][1];
 }
 
+// ---------- boat / hull ----------
+// Wind limits by hull type, in km/h: 'windy' is where the good-chop bonus
+// ends, 'strong' is where the bigger penalty starts, 'gust' is where the
+// unsafe warning fires. These are rule-of-thumb judgement calls, not a
+// regulation or a manufacturer rating - the app says so next to the selector.
+// Default is modified-V: the Crestliner Vision 1700 is an all-welded
+// aluminum boat, about 17.5 ft, with a 12-degree deadrise.
+var HULLS={
+  canoe:{label:'Canoe / kayak / small inflatable', short:'canoe/kayak', windy:15, strong:20, gust:28},
+  jon:  {label:'Flat-bottom jon boat',             short:'flat-bottom boat', windy:20, strong:26, gust:34},
+  modv: {label:'Modified-V (your Crestliner Vision 1700)', short:'modified-V hull', windy:25, strong:30, gust:40},
+  deepv:{label:'Deep-V',                           short:'deep-V hull', windy:28, strong:35, gust:45}
+};
+
 // ---------- state ----------
 var S = { data:null, idx:0, layer:store('wf.layer')||'wind', flow:store('wf.flow')!==false,
           spot:store('wf.spot')||CFG.defaultSpot, scores:[], astro:null, playing:null,
           spots:store('wf.spots')||[], catches:store('wf.catches')||[],
           sat:store('wf.sat')||false, addMode:false,
           radarOn:store('wf.radar')||false, radarTime:null,
-          alerts:null, alertsFailed:false,
+          alerts:null, alertsFailed:false, hull:store('wf.hull')||'modv',
           launches:store('wf.launches')||[], launchMode:false, routesOn:store('wf.routes')||false,
           waterTemp:store('wf.waterTemp')||null, waterClarity:store('wf.waterClarity')||null };
 if(!LAYERS[S.layer]) S.layer='wind';
+if(!HULLS[S.hull]) S.hull='modv';
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 function esc(v){ return String(v).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
 
@@ -354,14 +371,15 @@ function scoreHour(t,lat,lon){
   var s=spotAt(t,lat,lon), mid=S.data.times[t]+1800000, f=[], sc=50, unsafe=false;
   function add(p,txt){ sc+=p; f.push([p,txt]); }
 
+  var H=HULLS[S.hull]||HULLS.modv;
   if(s.spd!=null){
     if(s.spd<4) add(-3,'Nearly calm - fish in clear water spook easily');
     else if(s.spd<12) add(8,'Light ripple on the water');
-    else if(s.spd<25) add(12,'Good "walleye chop" - breaks up light, stirs bait');
-    else if(s.spd<35) add(-6,'Windy - boat control gets hard');
-    else add(-18,'Strong wind');
+    else if(s.spd<H.windy) add(12,'Good "walleye chop" - breaks up light, stirs bait');
+    else if(s.spd<H.strong) add(-6,'Windy for a '+H.short+' - boat control gets hard');
+    else add(-18,'Strong wind for a '+H.short);
   }
-  if(s.gust!=null && s.gust>=45){ add(-25,'Gusts '+Math.round(s.gust)+' km/h - unsafe for small boats'); unsafe=true; }
+  if(s.gust!=null && s.gust>=H.gust){ add(-25,'Gusts '+Math.round(s.gust)+' km/h - over the '+H.gust+' km/h limit for a '+H.short); unsafe=true; }
 
   if(t>=3){
     var p0=sample('pres',t-3,lat,lon);
@@ -463,6 +481,15 @@ function cycleClarity(){
   S.waterClarity=CLARITY_CYCLE[(i+1)%CLARITY_CYCLE.length];
   store('wf.waterClarity',S.waterClarity);
   render();
+}
+function hullRowHtml(){
+  var H=HULLS[S.hull]||HULLS.modv;
+  var opts=Object.keys(HULLS).map(function(k){
+    return '<option value="'+k+'"'+(k===S.hull?' selected':'')+'>'+esc(HULLS[k].label)+'</option>'; }).join('');
+  return '<div class="watertemp" style="cursor:default;flex-wrap:wrap"><span class="v">Boat</span>'+
+    '<select id="hullselect" class="sel">'+opts+'</select>'+
+    '<span class="k" style="flex-basis:100%">Unsafe warning at gusts of '+H.gust+' km/h, strong-wind penalty from '+
+    H.strong+' km/h. Rule-of-thumb limits, not a standard.</span></div>';
 }
 function waterClarityRowHtml(){
   var label=S.waterClarity ? CLARITY_LABEL[S.waterClarity] : 'Not set';
@@ -942,7 +969,9 @@ function render(){
     ? '<div class="tip">Wind from the <b>'+dir8word(s.dir)+'</b> is pushing water and baitfish onto the <b>'+dir8word(s.dir+180)+
       ' shore</b>. Walleye and pike often feed along that wind-blown side.</div>'
     : '';
-  var warn=r.unsafe ? '<div class="warn">Gusts '+Math.round(s.gust)+' km/h. Wabamun builds big waves fast - not small-boat weather.</div>' : '';
+  var HB=HULLS[S.hull]||HULLS.modv;
+  var warn=r.unsafe ? '<div class="warn">Gusts '+Math.round(s.gust)+' km/h is over the '+HB.gust+' km/h limit for a '+HB.short+
+    '. Shallow lakes like this build steep waves fast - stay off the water or stay close to shore.</div>' : '';
 
   var best=bestWindows().map(function(w){
     return '<li><a href="#" data-i="'+w.a+'" style="color:var(--accent)">'+fmtHour.format(T[w.a])+' - '+
@@ -966,6 +995,7 @@ function render(){
     '</div>'+shore+
     waterTempRowHtml(t)+
     waterClarityRowHtml()+
+    hullRowHtml()+
     '<h3>Why this score</h3><ul>'+(r.factors.length?r.factors.map(function(x){
       return '<li><span class="'+(x[0]>=0?'pos':'neg')+'">'+(x[0]>=0?'+':'')+x[0]+'</span> '+x[1]+'</li>'; }).join(''):'<li>Baseline 50</li>')+'</ul>'+
     biteGuideHtml(t)+
@@ -1107,6 +1137,7 @@ function spotsSectionHtml(t){
 function bindSpotsPanel(){
   var wtr=$('watertemprow'); if(wtr) wtr.onclick=promptWaterTemp;
   var wcr=$('waterclarityrow'); if(wcr) wcr.onclick=cycleClarity;
+  var hs=$('hullselect'); if(hs) hs.onchange=function(){ S.hull=this.value; store('wf.hull',S.hull); recompute(); render(); };
   Array.prototype.forEach.call(document.querySelectorAll('[data-golake]'),function(b){
     b.onclick=function(){
       var rg=CFG.regions.filter(function(x){ return x.id===b.getAttribute('data-golake'); })[0]; if(!rg) return;
