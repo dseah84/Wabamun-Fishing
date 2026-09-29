@@ -133,16 +133,16 @@ li{margin:2px 0}
 
 // ---------- config ----------
 var CFG = {
-  // HRDPS sampling grid(s), one box per lake. Wabamun's box is confirmed
-  // against the real HRDPS feed. Pigeon Lake is a real, well-known lake -
-  // higher confidence than the earlier Lake Isle/Spring Lake guesses - but
-  // still placed from memory, not looked up, so its box is padded wide and
-  // drawn as a dashed rectangle with a label: check it lands on the actual
-  // lake once this is pulled, and say so if it's off.
+  // HRDPS sampling grid(s), one box per lake (or, for Wabamun, one box
+  // spanning two lakes now). Wabamun's own shoreline is confirmed against
+  // the real HRDPS feed; the northward stretch to Lac Ste. Anne is placed
+  // from memory like Pigeon Lake was, padded wide, drawn as a dashed
+  // rectangle with a label - check it lands on the real lake once pulled.
   regions:[
     { id:'wabamun', name:'Wabamun Lake', center:[53.548,-114.60],
-      latMin:53.46, latMax:53.64, lonMin:-114.86, lonMax:-114.34, rows:7, cols:9,
-      labels:[['Wabamun',53.5586,-114.4718],['Seba Beach',53.5553,-114.7340]] },
+      latMin:53.46, latMax:53.80, lonMin:-114.86, lonMax:-114.15, rows:12, cols:11,
+      labels:[['Wabamun',53.5586,-114.4718],['Seba Beach',53.5553,-114.7340],
+              ['Lac Ste. Anne',53.695,-114.35],['Alberta Beach',53.6667,-114.3833]] },
     { id:'pigeonlake', name:'Pigeon Lake', center:[53.03,-114.03],
       latMin:52.94, latMax:53.12, lonMin:-114.16, lonMax:-113.88, rows:7, cols:8,
       labels:[['Pigeon Lake',53.03,-114.03],['Ma-Me-O Beach',52.9928,-114.0233]] }
@@ -601,8 +601,13 @@ var map=L.map('map',{zoomControl:false,attributionControl:true});
 // and this stops overriding them.
 var autoView=null;
 var HOME_LAKE=CFG.regions[0]; // Wabamun - opens here by default; the other lakes are a pan/jump away.
+// Fixed to Wabamun's own shoreline, on purpose separate from HOME_LAKE's
+// sampling box below - that box now reaches north to cover Lac Ste. Anne
+// too, but the app should still open tight on Wabamun, not zoomed out to
+// fit both lakes every time.
+var HOME_VIEW={latMin:53.46, latMax:53.64, lonMin:-114.86, lonMax:-114.34};
 function fitLake(){
-  var wide=window.innerWidth>=900, r=HOME_LAKE;
+  var wide=window.innerWidth>=900, r=HOME_VIEW;
   map.fitBounds([[r.latMin-0.04,r.lonMin-0.04],[r.latMax+0.03,r.lonMax+0.06]],{animate:false,paddingTopLeft:[10,wide?60:90],
     paddingBottomRight:[wide?410:10, wide?10:Math.round(window.innerHeight*0.56)]});
   autoView={center:map.getCenter(),zoom:map.getZoom()};
