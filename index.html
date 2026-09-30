@@ -144,10 +144,29 @@ var CFG = {
     { id:'wabamun', name:'Wabamun Lake', center:[53.548,-114.60],
       latMin:53.46, latMax:53.80, lonMin:-114.86, lonMax:-114.15, rows:12, cols:11,
       labels:[['Wabamun',53.5586,-114.4718],['Seba Beach',53.5553,-114.7340],
-              ['Lac Ste. Anne',53.695,-114.35],['Alberta Beach',53.6667,-114.3833]] },
+              ['Lac Ste. Anne',53.695,-114.35],['Alberta Beach',53.6667,-114.3833],
+              ['Jackfish Lake',53.4839,-114.2514]] },
     { id:'pigeonlake', name:'Pigeon Lake', center:[53.03,-114.03],
       latMin:52.94, latMax:53.12, lonMin:-114.16, lonMax:-113.88, rows:7, cols:8,
       labels:[['Pigeon Lake',53.03,-114.03],['Ma-Me-O Beach',52.9928,-114.0233]] }
+  ],
+  // Named lakes: what "Nearby Lakes" ranks, and what the wave estimate uses.
+  // 'model' is a rough ellipse - center, length and width in km, and the long
+  // axis's bearing in degrees clockwise from north - used only to work out how
+  // much open water the wind crosses before it reaches you. No shoreline data
+  // is reachable from here, so these are approximations, drawn dotted on the
+  // map so a bad fit is visible. Wabamun: 19.2 x 6.6 km, long axis roughly
+  // east-west (Seba Beach and Wabamun both sit just inside its two ends).
+  // Jackfish: published as 3.6 km long, 2.9 wide, 2.39 km2 in area, which do
+  // not agree with each other (an ellipse that size would be 8 km2), and I do
+  // not know its orientation, so it is a plain circle 3.25 km across.
+  // Pigeon Lake has no outline yet, so it gets wind-only limits.
+  lakes:[
+    { id:'wabamun', name:'Wabamun Lake', center:[53.548,-114.60],
+      model:{center:[53.548,-114.60], lengthKm:19.2, widthKm:6.6, bearing:90} },
+    { id:'jackfish', name:'Jackfish Lake', center:[53.4839,-114.2514], zoom:13,
+      model:{center:[53.4839,-114.2514], lengthKm:3.25, widthKm:3.25, bearing:0} },
+    { id:'pigeonlake', name:'Pigeon Lake', center:[53.03,-114.03] }
   ],
   defaultSpot:[53.548,-114.60],
   tz:'America/Edmonton',
@@ -221,11 +240,17 @@ function ramp(stops,v){
 // regulation or a manufacturer rating - the app says so next to the selector.
 // Default is modified-V: the Crestliner Vision 1700 is an all-welded
 // aluminum boat, about 17.5 ft, with a 12-degree deadrise.
+// 'wave' is the same idea in metres of estimated wave height - [choppy, rough,
+// unsafe] - and is what applies on a lake with an outline (wind speed alone
+// says little once you know how much open water is upwind). Calibrated so
+// each hull's wave limits land near its wind limits at a 10 km fetch, roughly
+// Wabamun's typical open water; Wabamun therefore behaves about as before,
+// while smaller lakes and upwind shores now get credit for the shorter fetch.
 var HULLS={
-  canoe:{label:'Canoe / kayak / small inflatable', short:'canoe/kayak', windy:15, strong:20, gust:28},
-  jon:  {label:'Flat-bottom jon boat',             short:'flat-bottom boat', windy:20, strong:26, gust:34},
-  modv: {label:'Modified-V (your Crestliner Vision 1700)', short:'modified-V hull', windy:25, strong:30, gust:40},
-  deepv:{label:'Deep-V',                           short:'deep-V hull', windy:28, strong:35, gust:45}
+  canoe:{label:'Canoe / kayak / small inflatable', short:'canoe/kayak', windy:15, strong:20, gust:28, wave:[0.20,0.30,0.40]},
+  jon:  {label:'Flat-bottom jon boat',             short:'flat-bottom boat', windy:20, strong:26, gust:34, wave:[0.30,0.40,0.55]},
+  modv: {label:'Modified-V (your Crestliner Vision 1700)', short:'modified-V hull', windy:25, strong:30, gust:40, wave:[0.40,0.50,0.70]},
+  deepv:{label:'Deep-V',                           short:'deep-V hull', windy:28, strong:35, gust:45, wave:[0.45,0.60,0.85]}
 };
 
 // Baseline for the hull limits above is roughly two adults aboard (400 lb).
@@ -238,7 +263,62 @@ function boatLimits(){
   if(!isFinite(lb)||lb<0) lb=BASE_LOAD_LB;
   var adj=Math.min(10,Math.max(0,Math.floor((lb-BASE_LOAD_LB)/40)));
   var windy=Math.max(12,H.windy-adj), strong=Math.max(windy+3,H.strong-adj), gust=Math.max(strong+3,H.gust-adj);
-  return {H:H, lb:lb, adj:adj, windy:windy, strong:strong, gust:gust};
+  var wf=1-0.04*adj; // wave limits shrink 4% per load step, to 60% at the cap
+  return {H:H, lb:lb, adj:adj, windy:windy, strong:strong, gust:gust,
+          wave:{comfy:H.wave[0]*wf, rough:H.wave[1]*wf, unsafe:H.wave[2]*wf}};
+}
+
+// ---------- lakes & wave estimate ----------
+// Position relative to a lake model, in km along its long axis (u) and across it (v).
+function lakeXY(m,lat,lon){
+  var rad=Math.PI/180, x=(lon-m.center[1])*111.32*Math.cos(m.center[0]*rad), y=(lat-m.center[0])*110.57, b=m.bearing*rad;
+  return {u:x*Math.sin(b)+y*Math.cos(b), v:x*Math.cos(b)-y*Math.sin(b)};
+}
+function lakeAt(lat,lon){
+  for(var i=0;i<CFG.lakes.length;i++){
+    var lk=CFG.lakes[i], m=lk.model; if(!m) continue;
+    var p=lakeXY(m,lat,lon), a=m.lengthKm/2, b=m.widthKm/2;
+    if((p.u*p.u)/(a*a)+(p.v*p.v)/(b*b)<=1) return lk;
+  }
+  return null;
+}
+// Fetch: km of open water from here to the shore, going upwind. windFrom is
+// the direction the wind blows FROM, in degrees. The lake is an ellipse, so
+// this is a ray-ellipse intersection: solve A t^2 + B t + C = 0 for t >= 0.
+function fetchKm(lk,lat,lon,windFrom){
+  var m=lk.model, a=m.lengthKm/2, b=m.widthKm/2, p=lakeXY(m,lat,lon), rad=Math.PI/180, w=windFrom*rad, be=m.bearing*rad;
+  var dx=Math.sin(w), dy=Math.cos(w); // unit vector pointing upwind (east, north)
+  var du=dx*Math.sin(be)+dy*Math.cos(be), dv=dx*Math.cos(be)-dy*Math.sin(be);
+  var A=(du*du)/(a*a)+(dv*dv)/(b*b), B=2*(p.u*du/(a*a)+p.v*dv/(b*b)), C=(p.u*p.u)/(a*a)+(p.v*p.v)/(b*b)-1;
+  if(C>0) return 0;
+  var disc=B*B-4*A*C; if(disc<0) return 0;
+  return Math.max(0,(-B+Math.sqrt(disc))/(2*A));
+}
+// Significant wave height (m): the average of the highest third of waves.
+// Fetch-limited growth from the standard shore-protection formulas:
+// Hs = 0.0016 * Ua * sqrt(F/g), Ua = 0.71 * U^1.23, capped at the fully
+// developed sea. It assumes deep water and wind that has blown long enough,
+// so on a shallow lake it errs a little high - the safe direction.
+function waveHs(windKmh,fkm){
+  var U=windKmh/3.6, g=9.81; if(U<=0||fkm<=0) return 0;
+  var UA=0.71*Math.pow(U,1.23);
+  return Math.min(0.0016*UA*Math.sqrt(fkm*1000/g), 0.243*UA*UA/g);
+}
+// Waves respond mostly to sustained wind, but gusts add some: count a quarter of the gust excess.
+function waveFor(s,lat,lon){
+  var lk=lakeAt(lat,lon); if(!lk||s.spd==null||s.dir==null) return null;
+  var g=s.gust!=null?s.gust:s.spd, ueff=s.spd+0.25*Math.max(0,g-s.spd), f=fetchKm(lk,lat,lon,s.dir);
+  return {hs:waveHs(ueff,f), fetchKm:f, lake:lk};
+}
+function waveTxt(h){ return h<0.05 ? 'under 0.1 m' : (Math.round(h*10)/10).toFixed(1)+' m'; }
+function ellipsePoints(m,n){
+  var pts=[], rad=Math.PI/180, b=m.bearing*rad, a=m.lengthKm/2, c=m.widthKm/2;
+  for(var i=0;i<n;i++){
+    var th=2*Math.PI*i/n, u=a*Math.cos(th), v=c*Math.sin(th);
+    var x=u*Math.sin(b)+v*Math.cos(b), y=u*Math.cos(b)-v*Math.sin(b);
+    pts.push([m.center[0]+y/110.57, m.center[1]+x/(111.32*Math.cos(m.center[0]*rad))]);
+  }
+  return pts;
 }
 
 // ---------- state ----------
@@ -386,15 +466,22 @@ function scoreHour(t,lat,lon){
   var s=spotAt(t,lat,lon), mid=S.data.times[t]+1800000, f=[], sc=50, unsafe=false;
   function add(p,txt){ sc+=p; f.push([p,txt]); }
 
-  var BL=boatLimits(), who=BL.H.short+(BL.adj?' carrying '+Math.round(BL.lb)+' lb':'');
+  var BL=boatLimits(), who=BL.H.short+(BL.adj?' carrying '+Math.round(BL.lb)+' lb':''), wv=waveFor(s,lat,lon), unsafeWhy=null;
   if(s.spd!=null){
     if(s.spd<4) add(-3,'Nearly calm - fish in clear water spook easily');
     else if(s.spd<12) add(8,'Light ripple on the water');
+    else if(wv){
+      var fw=round(wv.fetchKm,1)+' km of open water upwind';
+      if(wv.hs<BL.wave.comfy) add(12,'Good "walleye chop" - waves about '+waveTxt(wv.hs)+' ('+fw+'), enough to break up light without being a problem');
+      else if(wv.hs<BL.wave.rough) add(-6,'Choppy for a '+who+' - waves about '+waveTxt(wv.hs)+' ('+fw+')');
+      else add(-18,'Rough for a '+who+' - waves about '+waveTxt(wv.hs)+' ('+fw+')');
+    }
     else if(s.spd<BL.windy) add(12,'Good "walleye chop" - breaks up light, stirs bait');
     else if(s.spd<BL.strong) add(-6,'Windy for a '+who+' - boat control gets hard');
     else add(-18,'Strong wind for a '+who);
   }
-  if(s.gust!=null && s.gust>=BL.gust){ add(-25,'Gusts '+Math.round(s.gust)+' km/h - over the '+BL.gust+' km/h limit for a '+who); unsafe=true; }
+  if(s.gust!=null && s.gust>=BL.gust){ add(-25,'Gusts '+Math.round(s.gust)+' km/h - over the '+BL.gust+' km/h limit for a '+who); unsafe=true; unsafeWhy='gust'; }
+  else if(wv && wv.hs>=BL.wave.unsafe){ add(-25,'Waves about '+waveTxt(wv.hs)+' - over the '+waveTxt(BL.wave.unsafe)+' limit for a '+who); unsafe=true; unsafeWhy='wave'; }
 
   if(t>=3){
     var p0=sample('pres',t-3,lat,lon);
@@ -428,7 +515,7 @@ function scoreHour(t,lat,lon){
   }
   if(s.temp!=null && s.temp<=-25) add(-8,'Bitter cold');
 
-  return {score:clamp(Math.round(sc),0,100), factors:f, unsafe:unsafe, s:s};
+  return {score:clamp(Math.round(sc),0,100), factors:f, unsafe:unsafe, unsafeWhy:unsafeWhy, wave:wv, s:s};
 }
 // Rank every saved spot for hour t using the same rule-of-thumb score, just
 // centred on that spot's own coordinates instead of the active one.
@@ -497,6 +584,20 @@ function cycleClarity(){
   store('wf.waterClarity',S.waterClarity);
   render();
 }
+function waveRowHtml(r){
+  var BL=boatLimits(), wv=r.wave;
+  if(!wv){
+    if(lakeAt(S.spot[0],S.spot[1])) return ''; // on a modeled lake but no wind data: the out-of-area banner covers it
+    return '<div class="watertemp" style="cursor:default"><span class="v">Waves</span><span class="k">Not estimated here: this spot is outside the '+
+      'dotted lake outlines on the map, so the wind-only limits apply.</span></div>';
+  }
+  var col=wv.hs<BL.wave.comfy?'var(--good)':wv.hs<BL.wave.rough?'var(--fair)':'var(--poor)';
+  return '<div class="watertemp" style="cursor:default;flex-wrap:wrap"><span class="v" style="color:'+col+'">Waves ~'+waveTxt(wv.hs)+
+    ' <span class="k">('+round(wv.hs*3.281,1)+' ft)</span></span>'+
+    '<span class="k">'+round(wv.fetchKm,1)+' km of open water upwind on '+esc(wv.lake.name)+'</span>'+
+    '<span class="k" style="flex-basis:100%">Estimated from wind and a rough lake outline, not measured. The biggest waves in a set can run 1.5 to 2 times this. '+
+    'Your limits: choppy from '+waveTxt(BL.wave.comfy)+', rough from '+waveTxt(BL.wave.rough)+', unsafe from '+waveTxt(BL.wave.unsafe)+'.</span></div>';
+}
 function hullRowHtml(){
   var BL=boatLimits();
   var opts=Object.keys(HULLS).map(function(k){
@@ -505,8 +606,10 @@ function hullRowHtml(){
     '<select id="hullselect" class="sel">'+opts+'</select>'+
     '<span class="v">Load</span><input id="loadinput" class="sel" type="number" min="0" max="3000" step="25" value="'+
     Math.round(BL.lb)+'" style="flex:none;width:78px"><span class="k">lb of people</span>'+
-    '<span class="k" style="flex-basis:100%">Unsafe warning at gusts of '+BL.gust+' km/h, strong-wind penalty from '+BL.strong+' km/h'+
-    (BL.adj?' (lowered '+BL.adj+' km/h for the load; baseline is 400 lb)':'')+
+    '<span class="k" style="flex-basis:100%">On Wabamun and Jackfish the limits are waves: choppy from '+waveTxt(BL.wave.comfy)+
+    ', rough from '+waveTxt(BL.wave.rough)+', unsafe from '+waveTxt(BL.wave.unsafe)+'. Everywhere else it is wind: windy from '+BL.windy+
+    ', strong from '+BL.strong+' km/h. Gusts of '+BL.gust+' km/h are unsafe anywhere'+
+    (BL.adj?' (all lowered for the '+Math.round(BL.lb)+' lb load; baseline is 400 lb)':'')+
     '. Rule-of-thumb limits, not a standard. Your capacity plate has the real maximum.</span></div>';
 }
 function waterClarityRowHtml(){
@@ -658,7 +761,7 @@ function fitLake(){
   autoView={center:map.getCenter(),zoom:map.getZoom()};
 }
 fitLake();
-function goToRegion(rg){ map.flyTo(rg.center, 12, {duration:.6}); }
+function goToRegion(rg){ map.flyTo(rg.center, rg.zoom||12, {duration:.6}); }
 var resizeTimer=null;
 window.addEventListener('resize',function(){
   clearTimeout(resizeTimer);
@@ -690,6 +793,12 @@ CFG.regions.forEach(function(rg){
     L.circleMarker([p[1],p[2]],{radius:3,color:'#fff',weight:1,fillOpacity:1,interactive:false}).addTo(map)
      .bindTooltip(p[0],{permanent:true,direction:'right',className:'',opacity:.8});
   });
+});
+// The outlines the wave estimate is built on - dotted, so a bad fit against
+// the satellite view is obvious rather than hidden.
+CFG.lakes.forEach(function(lk){
+  if(!lk.model) return;
+  L.polygon(ellipsePoints(lk.model,72),{color:'#7ec8ff',weight:2,opacity:.9,dashArray:'1 6',lineCap:'round',fillColor:'#7ec8ff',fillOpacity:.06,interactive:false}).addTo(map);
 });
 var spotMarker=L.marker(S.spot,{icon:L.divIcon({className:'',html:'<div class="spot-icon"></div>',iconSize:[16,16],iconAnchor:[8,8]}),
   title:'Your spot (tap the map to move)'}).addTo(map);
@@ -987,10 +1096,11 @@ function render(){
     ? '<div class="tip">Wind from the <b>'+dir8word(s.dir)+'</b> is pushing water and baitfish onto the <b>'+dir8word(s.dir+180)+
       ' shore</b>. Walleye and pike often feed along that wind-blown side.</div>'
     : '';
-  var BB=boatLimits();
-  var warn=r.unsafe ? '<div class="warn">Gusts '+Math.round(s.gust)+' km/h is over the '+BB.gust+' km/h limit for a '+BB.H.short+
-    (BB.adj?' carrying '+Math.round(BB.lb)+' lb':'')+
-    '. Shallow lakes like this build steep waves fast - stay off the water or stay close to shore.</div>' : '';
+  var BB=boatLimits(), whoB=BB.H.short+(BB.adj?' carrying '+Math.round(BB.lb)+' lb':''), warn='';
+  if(r.unsafe && r.unsafeWhy==='wave') warn='<div class="warn">Waves of about '+waveTxt(r.wave.hs)+' ('+round(r.wave.fetchKm,1)+
+    ' km of open water upwind) are over the '+waveTxt(BB.wave.unsafe)+' limit for a '+whoB+'. Stay off the water or stay close to shore.</div>';
+  else if(r.unsafe) warn='<div class="warn">Gusts '+Math.round(s.gust)+' km/h is over the '+BB.gust+' km/h limit for a '+whoB+
+    '. Shallow lakes build steep waves fast - stay off the water or stay close to shore.</div>';
 
   var best=bestWindows().map(function(w){
     return '<li><a href="#" data-i="'+w.a+'" style="color:var(--accent)">'+fmtHour.format(T[w.a])+' - '+
@@ -1012,6 +1122,7 @@ function render(){
       cell('Cloud',fmt(s.cloud,0,'%'))+
       cell('Precip',fmt(s.precip,1,' mm'))+
     '</div>'+shore+
+    waveRowHtml(r)+
     waterTempRowHtml(t)+
     waterClarityRowHtml()+
     hullRowHtml()+
@@ -1108,10 +1219,10 @@ function spotToolsHtml(){
 // center as the sample point - a "Focus" here jumps the map and the active
 // spot both, so the score panel above starts describing that lake.
 function lakesSectionHtml(t){
-  if(CFG.regions.length<2) return ''; // nothing to rank against with only one lake
-  var rows=CFG.regions.map(function(rg){
-    var r=scoreHour(t,rg.center[0],rg.center[1]);
-    return {rg:rg, score:r.score, unsafe:r.unsafe};
+  if(CFG.lakes.length<2) return ''; // nothing to rank against with only one lake
+  var rows=CFG.lakes.map(function(lk){
+    var r=scoreHour(t,lk.center[0],lk.center[1]);
+    return {rg:lk, score:r.score, unsafe:r.unsafe};
   }).sort(function(a,b){ return b.score-a.score; }).map(function(x){
     var rt=rating(x.score);
     return '<div class="spotrow"><div class="spotmain">'+
@@ -1209,7 +1320,7 @@ function bindSpotsPanel(){
   };
   Array.prototype.forEach.call(document.querySelectorAll('[data-golake]'),function(b){
     b.onclick=function(){
-      var rg=CFG.regions.filter(function(x){ return x.id===b.getAttribute('data-golake'); })[0]; if(!rg) return;
+      var rg=CFG.lakes.filter(function(x){ return x.id===b.getAttribute('data-golake'); })[0]; if(!rg) return;
       S.spot=[rg.center[0],rg.center[1]]; store('wf.spot',S.spot); spotMarker.setLatLng(S.spot);
       goToRegion(rg); recompute(); render();
     };
