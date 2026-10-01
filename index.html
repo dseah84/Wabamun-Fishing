@@ -3,47 +3,51 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0f1720">
+<meta name="theme-color" content="#0B1418">
 <title>Wabamun Fishing Weather</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Instrument+Sans:wght@400;500;600&display=swap">
 <style>
 :root{
-  --bg:#0f1720; --panel:rgba(15,23,32,.94); --ink:#e6edf3; --muted:#8b9bab; --line:#2a3746;
-  --accent:#4fc3f7; --great:#2ea0ff; --good:#3fb950; --fair:#d29922; --poor:#f85149;
+  --bg:#0B1418; --panel:#121F25; --panel2:#182A31; --panel3:#0D171B;
+  --ink:#EDE8DC; --muted:#9DB2BA; --faint:#7A929B; --line:#23393F;
+  --accent:#7FD6E6; --great:#63B3FF; --good:#4FC38A; --fair:#E8B04A; --poor:#D9776A;
+  --serif:'Fraunces',Georgia,serif; --sans:'Instrument Sans',system-ui,-apple-system,"Segoe UI",sans-serif;
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
-  font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+  font:14px/1.4 var(--sans);overflow:hidden}
+a{color:var(--accent)}
 #map{position:absolute;inset:0;background:#0b1118}
 .fx{position:absolute;top:0;left:0;pointer-events:none;z-index:450}
 button{font:inherit;color:inherit;cursor:pointer}
 
 #top{position:absolute;top:0;left:0;right:0;z-index:1000;display:flex;flex-wrap:wrap;gap:8px;
   align-items:center;padding:10px 12px;padding-top:max(10px,env(safe-area-inset-top));
-  background:linear-gradient(var(--panel),rgba(15,23,32,0));pointer-events:none}
+  background:none;pointer-events:none}
 #top > *{pointer-events:auto}
-#top h1{font-size:16px;margin:0 8px 0 0;white-space:nowrap}
+#top h1{font:600 18px var(--serif);letter-spacing:-.01em;margin:0 8px 0 0;white-space:nowrap}
 .chips{display:flex;gap:4px;flex-wrap:wrap}
-.chip{background:rgba(30,42,56,.9);border:1px solid var(--line);border-radius:16px;padding:4px 11px;font-size:13px}
-.chip.on{background:var(--accent);color:#06121b;border-color:var(--accent);font-weight:600}
+.chip{background:var(--panel2);border:0;border-radius:18px;padding:6px 13px;font-size:13px;color:var(--ink)}
+.chip.on{background:var(--ink);color:#0E181D;font-weight:600}
 #refresh{margin-left:auto}
 
 #sheet{position:absolute;z-index:1000;left:0;right:0;bottom:0;max-height:56vh;overflow:auto;
-  background:var(--panel);border-top:1px solid var(--line);border-radius:14px 14px 0 0;
-  padding:10px 14px calc(12px + env(safe-area-inset-bottom))}
+  background:var(--panel);border-radius:24px 24px 0 0;
+  padding:12px 16px calc(12px + env(safe-area-inset-bottom))}
 @media (min-width:900px){
-  #sheet{left:auto;top:64px;right:12px;bottom:12px;width:390px;max-height:none;border:1px solid var(--line);border-radius:14px}
-  #legend{right:414px !important}
+  #sheet{left:auto;top:64px;right:16px;bottom:16px;width:432px;max-height:none;border-radius:24px}
+  #legend{right:464px !important}
 }
 .row{display:flex;align-items:center;gap:10px}
-#play{width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:#1b2a3a;flex:none}
+#play{width:40px;height:40px;border-radius:50%;border:0;background:var(--ink);color:#0E181D;flex:none}
 #slider{flex:1;accent-color:var(--accent)}
 #when{font-weight:600;min-width:120px;text-align:right;white-space:nowrap}
 
 #strip{display:flex;align-items:flex-end;gap:2px;height:54px;margin:10px 0 2px;position:relative}
 #strip .b{flex:1;min-width:4px;border-radius:2px 2px 0 0;cursor:pointer;opacity:.85}
 #strip .b.past{opacity:.3}
-#strip .b.sel{outline:2px solid #fff;outline-offset:1px;opacity:1}
+#strip .b.sel{outline:2px solid var(--ink);outline-offset:1px;opacity:1}
 #days{display:flex;font-size:11px;color:var(--muted);position:relative;height:14px}
 #days span{position:absolute;white-space:nowrap}
 
@@ -51,18 +55,18 @@ button{font:inherit;color:inherit;cursor:pointer}
 .big{font-size:34px;font-weight:700;line-height:1}
 .tag{padding:2px 8px;border-radius:10px;font-weight:600;font-size:13px;color:#06121b}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0}
-.cell{background:rgba(30,42,56,.7);border-radius:8px;padding:6px 8px}
+.cell{background:var(--panel2);border-radius:12px;padding:8px 10px}
 .cell .k{font-size:11px;color:var(--muted)}
 .cell .v{font-size:16px;font-weight:600}
-h3{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:14px 0 6px}
+h3{font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin:20px 0 8px}
 ul{margin:0;padding-left:18px}
 li{margin:2px 0}
 .pos{color:var(--good)} .neg{color:var(--poor)}
-.warn{background:rgba(248,81,73,.15);border:1px solid var(--poor);border-radius:8px;padding:6px 10px;margin:8px 0}
+.warn{background:rgba(217,119,106,.14);border:1px solid var(--poor);border-radius:12px;padding:8px 12px;margin:8px 0}
 .note{color:var(--muted);font-size:12px;margin-top:12px}
-.tip{background:rgba(79,195,247,.12);border-left:3px solid var(--accent);padding:6px 10px;border-radius:4px;margin:8px 0}
-.watertemp{display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(30,42,56,.7);
-  border-radius:8px;padding:7px 10px;margin:8px 0;cursor:pointer}
+.tip{background:rgba(127,214,230,.1);padding:10px 12px;border-radius:12px;margin:8px 0}
+.watertemp{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--panel2);
+  border-radius:12px;padding:10px 12px;margin:8px 0;cursor:pointer}
 .watertemp .v{font-weight:600}
 .watertemp .k{color:var(--muted);font-size:12px}
 .sel{flex:1;min-width:0;background:rgba(15,23,32,.9);color:var(--ink);border:1px solid var(--line);
@@ -72,7 +76,7 @@ li{margin:2px 0}
 .species .splures{color:var(--muted);font-size:12px}
 
 #legend{position:absolute;z-index:1000;right:12px;bottom:calc(56vh + 10px);background:var(--panel);
-  border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:11px;width:170px}
+  border-radius:12px;padding:8px 10px;font-size:11px;width:170px}
 @media (min-width:900px){#legend{bottom:12px}}
 #legend .bar{height:8px;border-radius:4px;margin:4px 0 2px}
 #legend .ends{display:flex;justify-content:space-between;color:var(--muted)}
@@ -92,6 +96,56 @@ li{margin:2px 0}
 .chip.sm{padding:2px 8px;font-size:11px}
 .tag.sm{padding:1px 6px;font-size:11px}
 .leaflet-container{background:#0b1118}
+/* ---- panel: tabs, Now screen ---- */
+.tabs{display:flex;gap:2px;padding:4px;background:var(--panel3);border-radius:24px;margin-bottom:12px}
+.tabs button{flex:1;height:36px;border:0;border-radius:18px;background:transparent;color:var(--muted);font-size:14px;font-weight:500}
+.tabs button.on{background:var(--ink);color:#0E181D;font-weight:600}
+.eyebrow{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.hs{display:flex;align-items:flex-end;gap:14px;margin-top:6px}
+.hnum{font-family:var(--serif);font-weight:600;font-size:72px;line-height:.9}
+.hside{display:flex;flex-direction:column;gap:6px;padding-bottom:4px}
+.pill{align-self:flex-start;color:#06170F;font-size:14px;font-weight:600;padding:3px 12px;border-radius:14px}
+.faint{color:var(--faint)}
+.faint2{font-size:13px;color:var(--muted)}
+.headline{font-family:var(--serif);font-weight:500;font-size:22px;line-height:1.25;margin-top:10px}
+.support{font-size:14px;line-height:1.45;color:var(--muted);margin-top:6px}
+.readings{display:flex;margin-top:16px}
+.readings>div{flex:1;display:flex;flex-direction:column;gap:2px;padding-left:14px;border-left:1px solid var(--line)}
+.readings>div:first-child{padding-left:0;border-left:0}
+.readings b{font-size:20px;font-weight:600}
+.readings b small{font-size:13px;font-weight:500;color:var(--muted)}
+.readings span{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+.card{background:var(--panel2);border-radius:16px;padding:14px 16px;margin-top:16px}
+.bchead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.bct{display:flex;align-items:center;gap:10px}
+.bct b{font-size:15px}
+.lvl{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600}
+.lvl i{display:inline-block;width:8px;height:8px;border-radius:50%}
+.lnk{border:0;background:transparent;color:var(--muted);font-size:13px;padding:0;min-height:44px}
+.card .mt+.mt{margin-top:14px}
+.mtl{font-size:13px;color:var(--muted);margin-bottom:6px}
+.meter{position:relative;display:flex;gap:2px;height:8px}
+.meter i{display:block;height:8px}
+.meter i:first-child{border-radius:4px 0 0 4px}
+.meter i:last-child{border-radius:0 4px 4px 0}
+.meter .mk{position:absolute;top:-4px;width:3px;height:16px;border-radius:2px;background:var(--ink);transform:translateX(-1px)}
+.mtr{display:flex;justify-content:space-between;gap:8px;font-size:12px;margin-top:6px}
+.mtr span:first-child{font-weight:600}
+.why{margin-top:12px;font-size:13px;line-height:1.45;color:var(--muted)}
+.win{display:flex;align-items:center;gap:12px;width:100%;min-height:52px;padding:0;border:0;border-top:1px solid var(--line);background:transparent;color:inherit;text-align:left}
+.wm{flex:1;display:flex;flex-direction:column;min-width:0}
+.wm b{font-size:15px;font-weight:500}
+.wm .faint{font-size:12px}
+.wbar{width:56px;height:6px;border-radius:3px;background:#24404A;flex:none}
+.wbar i{display:block;height:100%;border-radius:3px}
+.wnum{width:24px;text-align:right;font-size:14px;font-weight:600}
+.chev{color:var(--faint);font-size:18px}
+details.dt{border-top:1px solid var(--line);margin-top:16px}
+details.dt summary{min-height:44px;display:flex;align-items:center;cursor:pointer;font-size:14px;color:var(--muted)}
+.foot{margin-top:18px;padding-top:12px;border-top:1px solid var(--line);font-size:12px;line-height:1.45;color:var(--faint)}
+.alrt{font-size:13px;color:var(--muted);margin-bottom:6px}
+.alrt.on{background:rgba(217,119,106,.15);color:var(--ink);padding:8px 12px;border-radius:12px}
+.alrt .ok{color:var(--good);font-weight:700}
 .leaflet-tooltip{background:rgba(15,23,32,.8);color:var(--ink);border:0;box-shadow:none;font-size:11px;padding:1px 5px}
 .leaflet-tooltip-right:before{display:none}
 .leaflet-control-attribution{font-size:10px}
@@ -115,6 +169,7 @@ li{margin:2px 0}
 <div id="legend"></div>
 
 <div id="sheet">
+  <div id="tabs" class="tabs" role="tablist"></div>
   <div class="row">
     <button id="play" aria-label="Play">&#9654;</button>
     <input id="slider" type="range" min="0" max="0" value="0">
@@ -329,11 +384,12 @@ var S = { data:null, idx:0, layer:store('wf.layer')||'wind', flow:store('wf.flow
           radarOn:store('wf.radar')||false, radarTime:null,
           alerts:null, alertsFailed:false, hull:store('wf.hull')||'modv',
           loadLb:(function(){ var v=store('wf.loadLb'); return (typeof v==='number' && isFinite(v)) ? v : 600; })(),
-          blanks:store('wf.blanks')||[],
+          blanks:store('wf.blanks')||[], tab:store('wf.tab')||'now',
           launches:store('wf.launches')||[], launchMode:false, routesOn:store('wf.routes')||false,
           waterTemp:store('wf.waterTemp')||null, waterClarity:store('wf.waterClarity')||null };
 if(!LAYERS[S.layer]) S.layer='wind';
 if(!HULLS[S.hull]) S.hull='modv';
+if(['now','fish','spots','boat'].indexOf(S.tab)<0) S.tab='now';
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 function esc(v){ return String(v).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
 
@@ -1058,7 +1114,8 @@ function renderStrip(){
   S.scores.forEach(function(r,t){
     var b=document.createElement('div'), rt=rating(r.score);
     b.className='b'+(t===S.idx?' sel':'')+(T[t]<now?' past':'');
-    b.style.height=Math.max(6,r.score/100*54)+'px'; b.style.background=r.unsafe?'var(--poor)':rt.color;
+    b.style.height=Math.max(6,r.score/100*54)+'px'; b.style.backgroundColor=rt.color;
+    if(r.unsafe) b.style.backgroundImage='repeating-linear-gradient(135deg,#0E181D 0 2px,transparent 2px 5px)';
     b.title=fmtHour.format(T[t])+' - '+r.score+' '+rt.label;
     b.onclick=function(){ setIdx(t); };
     st.appendChild(b);
@@ -1069,81 +1126,162 @@ function renderStrip(){
   });
 }
 
+// ---------- the panel: four tabs ----------
+var TABS=[['now','Now'],['fish','Fish'],['spots','Spots'],['boat','Boat']];
+function renderTabs(){
+  $('tabs').innerHTML=TABS.map(function(x){
+    return '<button role="tab" aria-selected="'+(S.tab===x[0])+'" class="'+(S.tab===x[0]?'on':'')+'" data-tab="'+x[0]+'">'+x[1]+'</button>';
+  }).join('');
+}
+function goTab(k){ S.tab=k; store('wf.tab',k); $('sheet').scrollTop=0; render(); }
+function cap(x){ return x.charAt(0).toUpperCase()+x.slice(1); }
+function dayKey(ms){ return new Intl.DateTimeFormat('en-CA',{timeZone:CFG.tz,year:'numeric',month:'2-digit',day:'2-digit'}).format(ms); }
+var fmtWeekday=new Intl.DateTimeFormat('en-US',{timeZone:CFG.tz,weekday:'short'});
+
+// "this evening", "tomorrow morning", "Thu afternoon" - for the selected hour.
+function whenWord(t){
+  var ms=S.data.times[t], h=localHour(ms), part=h<5?'overnight':h<12?'morning':h<17?'afternoon':h<21?'evening':'night', k=dayKey(ms);
+  if(k===dayKey(Date.now())) return part==='night'?'tonight':part==='overnight'?'overnight':'this '+part;
+  return (k===dayKey(Date.now()+86400000)?'tomorrow':fmtWeekday.format(ms))+' '+part;
+}
+// How the water looks for the boat right now: comfortable / choppy / rough / unsafe.
+function boatLevel(r){
+  if(r.unsafe) return {label:'Unsafe',color:'var(--poor)'};
+  var BL=boatLimits(), lv=0;
+  if(r.wave) lv=r.wave.hs<BL.wave.comfy?0:r.wave.hs<BL.wave.rough?1:2;
+  else if(r.s.spd!=null) lv=r.s.spd<BL.windy?0:r.s.spd<BL.strong?1:2;
+  return [{label:'Comfortable',color:'var(--good)'},{label:'Choppy',color:'var(--fair)'},{label:'Rough',color:'#E38A4A'}][lv];
+}
+function headlineFor(r,t){
+  if(r.unsafe) return 'Stay off the water '+whenWord(t)+'.';
+  var lv=boatLevel(r).label, water=lv==='Comfortable'?'Easy water':lv==='Choppy'?'Choppy water':'Rough water';
+  var bite=r.score>=75?'a great bite':r.score>=60?'a decent bite':r.score>=45?'a so-so bite':'a slow bite';
+  return water+' and '+bite+' '+whenWord(t)+'.';
+}
+// The next hour that changes the boat answer, from the same unsafe flags the strip uses.
+function nextChangeLine(t){
+  var T=S.data.times, sc=S.scores, i, f=function(ms){ return fmtHour.format(ms).replace(',',''); };
+  if(sc[t].unsafe){
+    for(i=t+1;i<sc.length;i++) if(!sc[i].unsafe) return 'It eases enough for your boat around '+f(T[i])+'.';
+    return 'It stays unsafe for your boat through the rest of this forecast.';
+  }
+  for(i=t+1;i<sc.length;i++) if(sc[i].unsafe) return 'Conditions turn unsafe for your boat around '+f(T[i])+'.';
+  return 'No unsafe hours for your boat in this forecast.';
+}
+function unsafeText(r){
+  var BB=boatLimits(), who=BB.H.short+(BB.adj?' carrying '+Math.round(BB.lb)+' lb':'');
+  if(r.unsafeWhy==='wave') return 'Waves of about '+waveTxt(r.wave.hs)+' ('+round(r.wave.fetchKm,1)+' km of open water upwind) are over the '+
+    waveTxt(BB.wave.unsafe)+' limit for a '+who+'. Stay off the water or stay close to shore.';
+  return 'Gusts of '+Math.round(r.s.gust)+' km/h are over the '+BB.gust+' km/h limit for a '+who+
+    '. Shallow lakes build steep waves fast - stay off the water or stay close to shore.';
+}
+// One meter: colored zones (comfortable / choppy / unsafe), a marker for where today sits.
+function meterHtml(label,pct,zones,leftTxt,leftColor,rightTxt){
+  var segs=zones.map(function(z){ return '<i style="width:'+Math.max(0,z[0])+'%;background:'+z[1]+'"></i>'; }).join('');
+  return '<div class="mt"><div class="mtl">'+label+'</div><div class="meter">'+segs+'<b class="mk" style="left:'+clamp(pct,0,100)+'%"></b></div>'+
+    '<div class="mtr"><span style="color:'+leftColor+'">'+leftTxt+'</span><span class="faint">'+rightTxt+'</span></div></div>';
+}
+function boatCheckHtml(r){
+  var BL=boatLimits(), s=r.s, wv=r.wave, lv=boatLevel(r), m='';
+  var G='#2F6F55', A='#8A6B26', R='#8A3F38';
+  if(wv){
+    var mx=BL.wave.unsafe*1.25, c=BL.wave.comfy/mx*100, md=(BL.wave.unsafe-BL.wave.comfy)/mx*100;
+    var w=wv.hs<BL.wave.comfy?['comfortable','var(--good)']:wv.hs<BL.wave.rough?['choppy','var(--fair)']:wv.hs<BL.wave.unsafe?['rough','#E38A4A']:['unsafe','var(--poor)'];
+    m+=meterHtml('Waves &middot; '+round(wv.fetchKm,1)+' km of open water upwind',wv.hs/mx*100,[[c,G],[md,A],[100-c-md,R]],waveTxt(wv.hs)+' &middot; '+w[0],w[1],'unsafe from '+waveTxt(BL.wave.unsafe));
+  } else if(s.spd!=null){
+    var mx2=BL.strong*1.4, c2=BL.windy/mx2*100, md2=(BL.strong-BL.windy)/mx2*100;
+    var w2=s.spd<BL.windy?['comfortable','var(--good)']:s.spd<BL.strong?['windy','var(--fair)']:['strong','#E38A4A'];
+    m+=meterHtml('Wind &middot; no lake outline here, so wind limits apply',s.spd/mx2*100,[[c2,G],[md2,A],[100-c2-md2,R]],Math.round(s.spd)+' km/h &middot; '+w2[0],w2[1],'strong from '+BL.strong+' km/h');
+  }
+  if(s.gust!=null){
+    var gm=BL.gust*1.3, gc=BL.gust/gm*100;
+    var g=s.gust<BL.gust*0.8?['fine','var(--good)']:s.gust<BL.gust?['close to the limit','var(--fair)']:['over the limit','var(--poor)'];
+    m+=meterHtml('Gusts',s.gust/gm*100,[[gc,G],[100-gc,R]],Math.round(s.gust)+' km/h &middot; '+g[0],g[1],'unsafe from '+BL.gust+' km/h');
+  }
+  return '<div class="card"><div class="bchead"><div class="bct"><b>Boat check</b><span class="lvl" style="color:'+lv.color+'"><i style="background:'+lv.color+'"></i>'+lv.label+'</span></div>'+
+    '<button class="lnk" data-tab="boat">'+esc(cap(BL.H.short)+', '+Math.round(BL.lb)+' lb')+' &rsaquo;</button></div>'+m+
+    (r.unsafe?'<div class="why">'+unsafeText(r)+'</div>':'')+'</div>';
+}
+function windowsHtml(){
+  var T=S.data.times, ws=bestWindows();
+  if(!ws.length) return '<div class="faint" style="padding:8px 0">No Good-or-better windows in this 48-hour forecast.</div>';
+  return ws.map(function(w){
+    var rt=rating(w.avg), endMs=T[w.b]+3600000, sameDay=fmtDay.format(T[w.a])===fmtDay.format(endMs);
+    var label=fmtHour.format(T[w.a]).replace(',','')+' to '+(sameDay?'':fmtWeekday.format(endMs)+' ')+fmtTime.format(endMs).replace(':00','');
+    return '<button class="win" data-i="'+w.a+'"><span class="wm"><b>'+esc(label)+'</b><span class="faint">'+(w.b-w.a+1)+' h window</span></span>'+
+      '<span class="wbar"><i style="width:'+Math.round(w.avg)+'%;background:'+rt.color+'"></i></span><span class="wnum">'+Math.round(w.avg)+'</span><span class="chev">&rsaquo;</span></button>';
+  }).join('');
+}
+function nowTabHtml(c){
+  var r=c.r, s=r.s, rt=rating(r.score), T=S.data.times, t=S.idx, tagTxt=r.unsafe?'Unsafe':rt.label, tagColor=r.unsafe?'var(--poor)':rt.color;
+  var rel=Math.round((T[t]+1800000-Date.now())/3600000);
+  var readings=
+    '<div class="readings">'+
+      '<div><b>'+(s.spd==null?'-':Math.round(s.spd)+' <small>'+dir16(s.dir)+'</small>')+'</b><span>Wind km/h</span></div>'+
+      '<div><b>'+(s.gust==null?'-':Math.round(s.gust))+'</b><span>Gusts km/h</span></div>'+
+      '<div><b>'+(r.wave?waveTxt(r.wave.hs).replace(' m','')+' <small>m</small>':'-')+'</b><span>Waves</span></div>'+
+      '<div><b>'+(s.temp==null?'-':Math.round(s.temp)+'&deg;')+'</b><span>Air</span></div>'+
+    '</div>';
+  var factors='<ul>'+(r.factors.length?r.factors.map(function(x){
+    return '<li><span class="'+(x[0]>=0?'pos':'neg')+'">'+(x[0]>=0?'+':'')+x[0]+'</span> '+x[1]+'</li>'; }).join(''):'<li>Baseline 50</li>')+'</ul>';
+  return (S.alerts&&S.alerts.length?alertsHtml():'')+c.oob+
+    '<div class="eyebrow">'+esc(fmtHour.format(T[t]).replace(',',''))+(rel===0?' &middot; now':'')+'</div>'+
+    '<div class="hs"><div class="hnum" style="color:'+tagColor+'">'+r.score+'</div><div class="hside"><span class="pill" style="background:'+tagColor+'">'+tagTxt+'</span>'+
+      '<span class="faint2">at your spot &middot; '+S.spot[0].toFixed(3)+', '+S.spot[1].toFixed(3)+'</span></div></div>'+
+    '<div class="headline">'+esc(headlineFor(r,t))+'</div>'+
+    '<div class="support">'+esc(nextChangeLine(t))+'</div>'+
+    readings+
+    boatCheckHtml(r)+
+    '<h3>Best windows</h3><div>'+windowsHtml()+'</div>'+
+    '<details class="dt"><summary>Why this score</summary>'+factors+'</details>'+
+    '<details class="dt"><summary>More conditions</summary>'+waveRowHtml(r)+
+      '<div class="grid">'+cell('Pressure',s.pres==null?'-':Math.round(s.pres)+c.trend)+cell('Cloud',fmt(s.cloud,0,'%'))+cell('Precip',fmt(s.precip,1,' mm'))+'</div>'+
+      '<h3>Sun &amp; moon</h3><ul><li>Sunrise '+(c.sr?fmtTime.format(c.sr.t):'-')+', sunset '+(c.ss?fmtTime.format(c.ss.t):'-')+'</li>'+
+      '<li>'+moonPhaseName(c.ill.phase)+', '+Math.round(c.ill.fraction*100)+'% lit</li>'+c.sol.join('')+'</ul></details>'+
+    '<div class="foot">'+(S.alerts&&S.alerts.length?'':alertsHtml())+
+      'Forecast: ECCC HRDPS 2.5 km, fetched '+fmtHour.format(S.data.fetchedAt).replace(',','')+' '+fmtTime.format(S.data.fetchedAt)+
+      (S.data.stale?' <b style="color:var(--fair)">(offline copy)</b>':'')+'. The score is a rule-of-thumb guide, not a guarantee, and wave heights and lake outlines are estimates. '+
+      'Spots, catches, no-bite trips and boat settings live in this browser only. Export GPX to back up your spots; the catch and trip logs cannot be exported yet.</div>';
+}
+
 function render(){
   if(!S.data) return;
-  var T=S.data.times, t=S.idx, r=S.scores[t], s=r.s, rt=rating(r.score);
+  var T=S.data.times, t=S.idx, r=S.scores[t], s=r.s;
   var rel=Math.round((T[t]+1800000-Date.now())/3600000);
   $('when').textContent=fmtHour.format(T[t])+(rel===0?' (now)':rel>0?' (+'+rel+'h)':' ('+rel+'h)');
   renderStrip();
   renderRoutes(t);
+  renderTabs();
 
   var p0=t>=3?sample('pres',t-3,S.spot[0],S.spot[1]):null, dp=(p0!=null&&s.pres!=null)?s.pres-p0:null;
-  var trend=dp==null?'':dp<=-0.7?' ↓':dp>=0.7?' ↑':' →';
-  var mid=new Date(T[t]+1800000), ill=SunCalc.getMoonIllumination(mid);
+  var c={r:r, trend:dp==null?'':dp<=-0.7?' ↓':dp>=0.7?' ↑':' →'};
+  c.ill=SunCalc.getMoonIllumination(new Date(T[t]+1800000));
   var dayStart=T[t]-localHour(T[t])*3600000, dayEnd=dayStart+86400000;
   var sunToday=S.astro.sun.filter(function(e){return e.t>=dayStart&&e.t<dayEnd;});
-  var sr=sunToday.filter(function(e){return e.type==='rise';})[0], ss=sunToday.filter(function(e){return e.type==='set';})[0];
-  var sol;
-  sol=S.astro.moon.filter(function(e){return e.t>=T[t] && e.t<T[t]+86400000;}).slice(0,4)
+  c.sr=sunToday.filter(function(e){return e.type==='rise';})[0]; c.ss=sunToday.filter(function(e){return e.type==='set';})[0];
+  c.sol=S.astro.moon.filter(function(e){return e.t>=T[t] && e.t<T[t]+86400000;}).slice(0,4)
     .map(function(e){ var major=e.type==='overhead'||e.type==='underfoot';
       return '<li>'+fmtHour.format(e.t).split(' ')[0]+' '+fmtTime.format(e.t)+' - moon '+e.type+
-             ' <span style="color:var(--muted)">('+(major?'major, ~2h':'minor, ~1h')+')</span></li>'; });
-
-  var outside = !inGrid(S.spot[0],S.spot[1]);
-  var oob = outside ? '<div class="warn">This point is outside the HRDPS forecast area (the dashed box on the map) - '+
+             ' <span class="faint">('+(major?'major, ~2h':'minor, ~1h')+')</span></li>'; });
+  c.oob=!inGrid(S.spot[0],S.spot[1]) ? '<div class="warn">This point is outside the HRDPS forecast area (the dashed box on the map) - '+
     'wind, temp and the rest can\'t be shown here. Tap closer to Wabamun Lake, or use the "Focus" button on a saved spot.</div>' : '';
   var shore=s.dir!=null && s.spd>=8
     ? '<div class="tip">Wind from the <b>'+dir8word(s.dir)+'</b> is pushing water and baitfish onto the <b>'+dir8word(s.dir+180)+
       ' shore</b>. Walleye and pike often feed along that wind-blown side.</div>'
     : '';
-  var BB=boatLimits(), whoB=BB.H.short+(BB.adj?' carrying '+Math.round(BB.lb)+' lb':''), warn='';
-  if(r.unsafe && r.unsafeWhy==='wave') warn='<div class="warn">Waves of about '+waveTxt(r.wave.hs)+' ('+round(r.wave.fetchKm,1)+
-    ' km of open water upwind) are over the '+waveTxt(BB.wave.unsafe)+' limit for a '+whoB+'. Stay off the water or stay close to shore.</div>';
-  else if(r.unsafe) warn='<div class="warn">Gusts '+Math.round(s.gust)+' km/h is over the '+BB.gust+' km/h limit for a '+whoB+
-    '. Shallow lakes build steep waves fast - stay off the water or stay close to shore.</div>';
 
-  var best=bestWindows().map(function(w){
-    return '<li><a href="#" data-i="'+w.a+'" style="color:var(--accent)">'+fmtHour.format(T[w.a])+' - '+
-      (fmtDay.format(T[w.a])===fmtDay.format(T[w.b]+3600000)?'':fmtDay.format(T[w.b]+3600000).split(',')[0]+' ')+
-      fmtTime.format(T[w.b]+3600000)+'</a> (avg '+Math.round(w.avg)+')</li>'; }).join('') ||
-    '<li>No Good-or-better windows in this HRDPS run.</li>';
+  var body;
+  if(S.tab==='fish') body=shore+waterTempRowHtml(t)+waterClarityRowHtml()+biteGuideHtml(t);
+  else if(S.tab==='spots') body=lakesSectionHtml(t)+spotsSectionHtml(t)+tripLogHtml()+launchesSectionHtml();
+  else if(S.tab==='boat') body='<h3 style="margin-top:4px">Your boat</h3>'+hullRowHtml();
+  else body=nowTabHtml(c);
+  $('detail').innerHTML=body;
 
-  $('detail').innerHTML=
-    alertsHtml()+
-    '<div class="score"><div class="big">'+r.score+'</div><div><span class="tag" style="background:'+(r.unsafe?'var(--poor)':rt.color)+'">'+
-      (r.unsafe?'Unsafe':rt.label)+'</span><div class="note" style="margin:4px 0 0">Fishing outlook at your spot ('+
-      S.spot[0].toFixed(3)+', '+S.spot[1].toFixed(3)+')</div></div></div>'+
-    oob+warn+
-    '<div class="grid">'+
-      cell('Wind',s.spd==null?'-':Math.round(s.spd)+' '+dir16(s.dir))+
-      cell('Gusts',fmt(s.gust,0,' km/h'))+
-      cell('Temp',fmt(s.temp,0,'°C'))+
-      cell('Pressure',s.pres==null?'-':Math.round(s.pres)+trend)+
-      cell('Cloud',fmt(s.cloud,0,'%'))+
-      cell('Precip',fmt(s.precip,1,' mm'))+
-    '</div>'+shore+
-    waveRowHtml(r)+
-    waterTempRowHtml(t)+
-    waterClarityRowHtml()+
-    hullRowHtml()+
-    '<h3>Why this score</h3><ul>'+(r.factors.length?r.factors.map(function(x){
-      return '<li><span class="'+(x[0]>=0?'pos':'neg')+'">'+(x[0]>=0?'+':'')+x[0]+'</span> '+x[1]+'</li>'; }).join(''):'<li>Baseline 50</li>')+'</ul>'+
-    biteGuideHtml(t)+
-    '<h3>Best upcoming windows</h3><ul id="best">'+best+'</ul>'+
-    '<h3>Sun &amp; moon</h3><ul>'+
-      '<li>Sunrise '+(sr?fmtTime.format(sr.t):'-')+', sunset '+(ss?fmtTime.format(ss.t):'-')+'</li>'+
-      '<li>'+moonPhaseName(ill.phase)+', '+Math.round(ill.fraction*100)+'% lit</li>'+sol.join('')+'</ul>'+
-    lakesSectionHtml(t)+
-    spotsSectionHtml(t)+
-    tripLogHtml()+
-    launchesSectionHtml()+
-    '<div class="note">Forecast: ECCC HRDPS 2.5 km (48 h), via Open-Meteo. Fetched '+fmtHour.format(S.data.fetchedAt)+' '+
-      fmtTime.format(S.data.fetchedAt)+(S.data.stale?' <b style="color:var(--fair)">(offline copy)</b>':'')+
-      '. The score is a rule-of-thumb guide, not a guarantee. Tap the map to move your spot. '+
-      'Spots, catches, no-bite trips and boat settings live in this browser only. Export GPX to back up your spots; the catch and trip logs cannot be exported yet.</div>';
-
-  Array.prototype.forEach.call(document.querySelectorAll('#best a'),function(a){
-    a.onclick=function(e){ e.preventDefault(); setIdx(+a.getAttribute('data-i')); };
+  Array.prototype.forEach.call(document.querySelectorAll('[data-tab]'),function(b){
+    b.onclick=function(){ goTab(b.getAttribute('data-tab')); };
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.win'),function(b){
+    b.onclick=function(){ setIdx(+b.getAttribute('data-i')); };
   });
   bindSpotsPanel();
 }
@@ -1163,19 +1301,11 @@ function fetchAlerts(){
     .catch(function(e){ console.warn('Alerts check unavailable:',e); S.alertsFailed=true; if(S.data) render(); });
 }
 function alertsHtml(){
-  var link='<a href="'+ALERTS_LINK+'" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">'+
-    'Check Environment Canada alerts for this area &#8599;</a>';
-  if(S.alerts && S.alerts.length){
-    return '<div class="warn">'+S.alerts.length+' active Environment Canada alert'+(S.alerts.length>1?'s':'')+
-      ' may cover this area. '+link+'</div>';
-  }
-  if(S.alertsFailed){
-    return '<div class="note" style="margin:0 0 8px">Could not check for active alerts automatically. '+link+'</div>';
-  }
-  if(S.alerts){
-    return '<div class="note" style="margin:0 0 8px">No active alerts found nearby (automatic check). '+link+'</div>';
-  }
-  return '<div class="note" style="margin:0 0 8px">'+link+'</div>';
+  var link='<a href="'+ALERTS_LINK+'" target="_blank" rel="noopener">Environment Canada &#8599;</a>';
+  if(S.alerts && S.alerts.length) return '<div class="alrt on">'+S.alerts.length+' active alert'+(S.alerts.length>1?'s':'')+' may cover this area - '+link+'</div>';
+  if(S.alertsFailed) return '<div class="alrt">Could not check for alerts automatically - '+link+'</div>';
+  if(S.alerts) return '<div class="alrt"><span class="ok">&#10003;</span> No active alerts detected - '+link+'</div>';
+  return '<div class="alrt">'+link+'</div>';
 }
 
 // ---------- Garmin GPX waypoints ----------
@@ -1322,7 +1452,7 @@ function bindSpotsPanel(){
     b.onclick=function(){
       var rg=CFG.lakes.filter(function(x){ return x.id===b.getAttribute('data-golake'); })[0]; if(!rg) return;
       S.spot=[rg.center[0],rg.center[1]]; store('wf.spot',S.spot); spotMarker.setLatLng(S.spot);
-      goToRegion(rg); recompute(); render();
+      goToRegion(rg); recompute(); S.tab='now'; store('wf.tab','now'); render();
     };
   });
   Array.prototype.forEach.call(document.querySelectorAll('[data-dellaunch]'),function(b){
