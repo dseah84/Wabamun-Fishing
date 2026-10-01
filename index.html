@@ -62,7 +62,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 }
 @media (min-width:900px){ .tools{margin-left:auto} }
 
-#sheet{position:absolute;z-index:1000;left:0;right:0;bottom:0;height:46vh;overflow:auto;
+#sheet{position:absolute;z-index:1000;left:0;right:0;bottom:0;height:var(--shh,46vh);overflow:auto;
   background:var(--panel);border-radius:24px 24px 0 0;
   padding:12px 16px calc(12px + env(safe-area-inset-bottom))}
 @media (min-width:900px){
@@ -100,13 +100,16 @@ li{margin:2px 0}
 .watertemp .k{color:var(--muted);font-size:12px}
 .sel{flex:1;min-width:0;background:rgba(15,23,32,.9);color:var(--ink);border:1px solid var(--line);
   border-radius:8px;padding:4px 6px;font:inherit}
-.species{margin:6px 0 12px}
-.species .sphead{display:flex;align-items:center;gap:8px;font-weight:600;margin-bottom:2px}
+.species{background:var(--panel2);border-radius:16px;padding:14px 16px;margin:10px 0}
+.species .sphead{display:flex;align-items:baseline;gap:10px;margin-bottom:4px}
+.species .sphead b{font-family:var(--serif);font-size:18px;font-weight:600}
+.species .spact{font-size:12px;color:var(--muted)}
+.species .cell{background:var(--panel3)}
 .species .splures{color:var(--muted);font-size:12px}
 
 #mapbottom{position:absolute;z-index:1000;left:16px;right:464px;bottom:16px;display:flex;flex-direction:column;gap:10px;align-items:flex-start;pointer-events:none}
 #mapbottom>*{pointer-events:auto}
-@media (max-width:899px){#mapbottom{left:8px;right:8px;bottom:calc(46vh + 8px);gap:6px}#legend{width:170px;padding:6px 8px}#legend .lnote{display:none}}
+@media (max-width:899px){#mapbottom{left:8px;right:8px;bottom:calc(var(--shh,46vh) + 8px);gap:6px}#legend{width:170px;padding:6px 8px}#legend .lnote{display:none}}
 #legend{background:rgba(18,31,37,.94);border-radius:12px;padding:8px 10px;font-size:11px;width:210px}
 #legend .lnote{color:var(--faint);margin-top:4px;line-height:1.35}
 #dock{width:100%;max-width:760px;box-sizing:border-box;background:rgba(18,31,37,.96);border-radius:20px;padding:10px 14px 6px}
@@ -179,6 +182,53 @@ details.dt summary{min-height:44px;display:flex;align-items:center;cursor:pointe
 .alrt{font-size:13px;color:var(--muted);margin-bottom:6px}
 .alrt.on{background:rgba(217,119,106,.15);color:var(--ink);padding:8px 12px;border-radius:12px}
 .alrt .ok{color:var(--good);font-weight:700}
+.spotbtns .chip{min-height:40px;padding:0 14px}
+.spotbtns.full{flex-basis:100%;width:100%}
+.spotbtns.full .chip{flex:1;padding:0 6px;white-space:nowrap}
+.chip.pri{background:var(--ink);color:#0E181D;font-weight:600}
+.clarity{margin:12px 0}
+.cl-h{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-bottom:8px}
+.seg2{display:flex;gap:2px;padding:4px;background:var(--panel3);border-radius:24px}
+.seg2 button{flex:1;height:40px;border:0;border-radius:20px;background:transparent;color:var(--muted);font-size:14px;font-weight:500}
+.seg2 button.on{background:var(--ink);color:#0E181D;font-weight:600}
+.bt-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.bt-h b{font-family:var(--serif);font-size:22px;font-weight:600}
+.hullcard{display:flex;align-items:center;gap:12px;min-height:56px;width:100%;box-sizing:border-box;border:0;border-radius:14px;background:var(--panel2);color:inherit;text-align:left;padding:8px 16px;margin-bottom:8px}
+.hullcard.on{background:#1F343B;outline:2px solid var(--ink);outline-offset:-2px}
+.hullcard .rad{width:20px;height:20px;border-radius:50%;border:2px solid #5A747E;box-sizing:border-box;flex:none;display:flex;align-items:center;justify-content:center}
+.hullcard.on .rad{border-color:var(--ink)}
+.hullcard.on .rad i{width:8px;height:8px;border-radius:50%;background:var(--ink)}
+.hullcard .hc{display:flex;flex-direction:column}
+.hullcard .hc b{font-size:15px;font-weight:500}
+.hullcard.on .hc b{font-weight:600}
+.hullcard .hc span{font-size:12px;color:var(--faint)}
+.loadcard{background:var(--panel2);border-radius:16px;padding:14px 16px 16px}
+.loadcard .lh{display:flex;align-items:baseline;justify-content:space-between}
+.loadcard .lh span:first-child{font-size:13px;color:var(--muted)}
+.loadcard .lh b{font-family:var(--serif);font-size:26px;font-weight:600}
+.loadcard input[type=range]{width:100%;height:44px;accent-color:var(--ink);margin:2px 0}
+.loadcard .tk{display:flex;justify-content:space-between;font-size:11px;color:var(--faint)}
+.limits{background:var(--panel2);border-radius:16px;padding:4px 16px}
+.limits div{display:flex;align-items:center;gap:10px;min-height:44px;font-size:14px}
+.limits div+div{border-top:1px solid var(--line)}
+.limits i{width:10px;height:10px;border-radius:50%;flex:none}
+.limits span{flex:1}
+.limits b{font-weight:600}
+#grab{display:none;justify-content:center;align-items:center;height:28px;position:sticky;top:0;z-index:2;background:var(--panel);touch-action:none;cursor:grab;margin:0 -16px}
+#grab i{width:36px;height:4px;border-radius:2px;background:#3A555F}
+#peek{display:none;align-items:center;gap:14px;touch-action:none;cursor:pointer;padding-bottom:6px}
+.pk-num{font:600 44px/1 var(--serif)}
+.pk-main{display:flex;flex-direction:column;gap:4px;min-width:0}
+.pk-main .pill{font-size:12px;padding:2px 10px}
+.pk-main span:last-child{font:500 16px/1.25 var(--serif);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:899px){
+  #sheet{padding-top:0;transition:height .22s ease}
+  #sheet.drag{transition:none}
+  #grab{display:flex}
+  #sheet.peek #peek{display:flex}
+  #sheet.peek #tabs,#sheet.peek #detail{display:none}
+}
+@media (pointer:coarse){ .tabs button{height:44px} }
 .leaflet-tooltip{background:rgba(15,23,32,.8);color:var(--ink);border:0;box-shadow:none;font-size:11px;padding:1px 5px}
 .leaflet-tooltip-right:before{display:none}
 .leaflet-control-attribution{font-size:10px}
@@ -228,6 +278,8 @@ details.dt summary{min-height:44px;display:flex;align-items:center;cursor:pointe
 </div>
 
 <div id="sheet">
+  <div id="grab" role="button" tabindex="0" aria-label="Resize panel"><i></i></div>
+  <div id="peek" role="button" tabindex="0" aria-label="Open details"></div>
   <div id="tabs" class="tabs" role="tablist"></div>
   <div id="detail"></div>
 </div>
@@ -376,8 +428,8 @@ var HULLS={
 // 10: a heavier boat sits lower, so waves come aboard sooner. Again my own
 // rule of thumb, and the selector row says so.
 var BASE_LOAD_LB=400;
-function boatLimits(){
-  var H=HULLS[S.hull]||HULLS.modv, lb=+S.loadLb;
+function boatLimits(key){
+  var H=HULLS[key||S.hull]||HULLS.modv, lb=+S.loadLb;
   if(!isFinite(lb)||lb<0) lb=BASE_LOAD_LB;
   var adj=Math.min(10,Math.max(0,Math.floor((lb-BASE_LOAD_LB)/40)));
   var windy=Math.max(12,H.windy-adj), strong=Math.max(windy+3,H.strong-adj), gust=Math.max(strong+3,H.gust-adj);
@@ -447,12 +499,13 @@ var S = { data:null, idx:0, layer:store('wf.layer')||'wind', flow:store('wf.flow
           radarOn:store('wf.radar')||false, radarTime:null,
           alerts:null, alertsFailed:false, hull:store('wf.hull')||'modv',
           loadLb:(function(){ var v=store('wf.loadLb'); return (typeof v==='number' && isFinite(v)) ? v : 600; })(),
-          blanks:store('wf.blanks')||[], tab:store('wf.tab')||'now',
+          blanks:store('wf.blanks')||[], tab:store('wf.tab')||'now', sheet:store('wf.sheet')||'peek',
           launches:store('wf.launches')||[], launchMode:false, routesOn:store('wf.routes')||false,
           waterTemp:store('wf.waterTemp')||null, waterClarity:store('wf.waterClarity')||null };
 if(!LAYERS[S.layer]) S.layer='wind';
 if(!HULLS[S.hull]) S.hull='modv';
 if(['now','fish','spots','boat'].indexOf(S.tab)<0) S.tab='now';
+if(['peek','half','full'].indexOf(S.sheet)<0) S.sheet='peek';
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 function esc(v){ return String(v).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
 
@@ -717,24 +770,35 @@ function waveRowHtml(r){
     '<span class="k" style="flex-basis:100%">Estimated from wind and a rough lake outline, not measured. The biggest waves in a set can run 1.5 to 2 times this. '+
     'Your limits: choppy from '+waveTxt(BL.wave.comfy)+', rough from '+waveTxt(BL.wave.rough)+', unsafe from '+waveTxt(BL.wave.unsafe)+'.</span></div>';
 }
+var HULL_CARD={canoe:['Canoe, kayak or small inflatable',''], jon:['Flat-bottom jon boat',''],
+               modv:['Modified-V','Your Crestliner Vision 1700'], deepv:['Deep-V','']};
 function hullRowHtml(){
-  var BL=boatLimits();
-  var opts=Object.keys(HULLS).map(function(k){
-    return '<option value="'+k+'"'+(k===S.hull?' selected':'')+'>'+esc(HULLS[k].label)+'</option>'; }).join('');
-  return '<div class="watertemp" style="cursor:default;flex-wrap:wrap;gap:6px 8px"><span class="v">Boat</span>'+
-    '<select id="hullselect" class="sel">'+opts+'</select>'+
-    '<span class="v">Load</span><input id="loadinput" class="sel" type="number" min="0" max="3000" step="25" value="'+
-    Math.round(BL.lb)+'" style="flex:none;width:78px"><span class="k">lb of people</span>'+
-    '<span class="k" style="flex-basis:100%">On Wabamun and Jackfish the limits are waves: choppy from '+waveTxt(BL.wave.comfy)+
-    ', rough from '+waveTxt(BL.wave.rough)+', unsafe from '+waveTxt(BL.wave.unsafe)+'. Everywhere else it is wind: windy from '+BL.windy+
-    ', strong from '+BL.strong+' km/h. Gusts of '+BL.gust+' km/h are unsafe anywhere'+
-    (BL.adj?' (all lowered for the '+Math.round(BL.lb)+' lb load; baseline is 400 lb)':'')+
-    '. Rule-of-thumb limits, not a standard. Your capacity plate has the real maximum.</span></div>';
+  var BL=boatLimits(), lb=Math.round(BL.lb);
+  var cards=Object.keys(HULLS).map(function(k){
+    var on=k===S.hull, hc=HULL_CARD[k]||[HULLS[k].label,''], L=boatLimits(k);
+    return '<button class="hullcard'+(on?' on':'')+'" role="radio" aria-checked="'+on+'" data-hull="'+k+'"><span class="rad"><i></i></span>'+
+      '<span class="hc"><b>'+esc(hc[0])+'</b><span>'+(hc[1]?esc(hc[1])+' &middot; ':'')+'comfortable to '+waveTxt(L.wave.comfy)+' waves</span></span></button>';
+  }).join('');
+  function dot(c){ return '<i style="background:'+c+'"></i>'; }
+  return '<div class="bt-h"><b>Your boat</b><span class="faint" style="font-size:12px">Sets the limits behind every score</span></div>'+
+    '<h3>Hull</h3><div role="radiogroup" aria-label="Hull type">'+cards+'</div>'+
+    '<h3>Load</h3><div class="loadcard"><div class="lh"><span>People aboard</span><b id="loadval">'+lb+' lb</b></div>'+
+      '<input id="loadinput" type="range" min="0" max="1500" step="25" value="'+Math.min(lb,1500)+'" aria-label="People aboard, pounds">'+
+      '<div class="tk"><span>0</span><span>750</span><span>1500 lb</span></div>'+
+      '<div class="faint" style="font-size:12px;line-height:1.45;margin-top:8px">Baseline is about two adults, 400 lb. Every 40 lb more lowers your limits a little.</div></div>'+
+    '<h3>Your limits today</h3><div class="limits">'+
+      '<div>'+dot('var(--fair)')+'<span>Waves get choppy</span><b>'+waveTxt(BL.wave.comfy)+'</b></div>'+
+      '<div>'+dot('#E38A4A')+'<span>Waves get rough</span><b>'+waveTxt(BL.wave.rough)+'</b></div>'+
+      '<div>'+dot('var(--poor)')+'<span>Waves unsafe</span><b>'+waveTxt(BL.wave.unsafe)+'</b></div>'+
+      '<div>'+dot('var(--poor)')+'<span>Gusts unsafe</span><b>'+BL.gust+' km/h</b></div></div>'+
+    '<div class="faint" style="font-size:12px;line-height:1.45;margin-top:10px">Waves decide on Wabamun and Jackfish. Where a lake has no outline yet, wind decides: windy from '+BL.windy+
+      ', strong from '+BL.strong+' km/h. Rule-of-thumb limits for a '+esc(BL.H.short)+' carrying '+lb+' lb, not a standard. Your capacity plate has the real maximum.</div>';
 }
 function waterClarityRowHtml(){
-  var label=S.waterClarity ? CLARITY_LABEL[S.waterClarity] : 'Not set';
-  return '<div class="watertemp" id="waterclarityrow"><span class="v">Water clarity: '+label+'</span>'+
-    '<span class="k">Tap to cycle &rsaquo;</span></div>';
+  return '<div class="clarity"><div class="cl-h"><span>Water clarity</span><span>'+(S.waterClarity?'':'Not set')+'</span></div>'+
+    '<div class="seg2" role="group" aria-label="Water clarity">'+CLARITY_CYCLE.map(function(k){
+      return '<button data-clarity="'+k+'" aria-pressed="'+(S.waterClarity===k)+'" class="'+(S.waterClarity===k?'on':'')+'">'+CLARITY_LABEL[k]+'</button>';
+    }).join('')+'</div></div>';
 }
 // Color advice by species and water clarity - general, well-established
 // angling knowledge (dark/bright colors show up better against different
@@ -840,7 +904,7 @@ function biteGuideHtml(t){
   var rows=bg.species.map(function(sp){
     var l=sp.lure;
     return '<div class="species">'+
-      '<div class="sphead">'+esc(sp.name)+' <span class="note" style="margin:0">- '+esc(sp.activity)+'</span></div>'+
+      '<div class="sphead"><b>'+esc(sp.name)+'</b><span class="spact">'+esc(sp.activity)+'</span></div>'+
       '<div class="note" style="margin:0 0 6px">'+esc(sp.note)+'</div>'+
       '<details><summary style="cursor:pointer"><span class="tag sm" style="background:var(--great);margin-right:6px">Top pick</span>'+
         '<b>'+esc(l.name)+'</b></summary>'+
@@ -873,10 +937,15 @@ var HOME_LAKE=CFG.regions[0]; // Wabamun - opens here by default; the other lake
 // too, but the app should still open tight on Wabamun, not zoomed out to
 // fit both lakes every time.
 var HOME_VIEW={latMin:53.46, latMax:53.64, lonMin:-114.86, lonMax:-114.34};
+// Phone panel: three heights. Peek shows just the score and headline.
+function sheetPx(k){ var h=window.innerHeight; return k==='peek'?112:k==='half'?Math.round(h*0.46):h-112; }
+function setSheetVar(px){ document.documentElement.style.setProperty('--shh',(px==null?sheetPx(S.sheet):px)+'px'); }
+setSheetVar(); document.getElementById('sheet').classList.toggle('peek',S.sheet==='peek');
 function fitLake(){
   var wide=window.innerWidth>=900, r=HOME_VIEW;
+  var dk=document.getElementById('dock').getBoundingClientRect(), padBot=Math.max(10,Math.round(window.innerHeight-dk.top+6));
   map.fitBounds([[r.latMin-0.04,r.lonMin-0.04],[r.latMax+0.03,r.lonMax+0.06]],{animate:false,paddingTopLeft:[10,wide?60:90],
-    paddingBottomRight:[wide?410:10, wide?10:Math.round(window.innerHeight*0.56)]});
+    paddingBottomRight:[wide?410:10, wide?10:padBot]});
   autoView={center:map.getCenter(),zoom:map.getZoom()};
 }
 fitLake();
@@ -1166,6 +1235,42 @@ $('play').onclick=function(){
 };
 $('refresh').onclick=function(){ load(true); };
 
+// ---- phone panel: tap or drag the handle between peek / half / full
+function refitIfAuto(){
+  map.invalidateSize(); var c=map.getCenter();
+  if(autoView && map.getZoom()===autoView.zoom && Math.abs(c.lat-autoView.center.lat)<0.001 && Math.abs(c.lng-autoView.center.lng)<0.001) fitLake();
+}
+function applySheet(k){
+  S.sheet=k; store('wf.sheet',k); setSheetVar(); $('sheet').classList.toggle('peek',k==='peek');
+  if(window.innerWidth<900) setTimeout(refitIfAuto,250);
+}
+window.addEventListener('resize',function(){ setSheetVar(); });
+(function(){
+  var el=$('sheet'), y0=0, h0=0, moved=false, drag=false;
+  function cycle(){ applySheet(S.sheet==='peek'?'half':S.sheet==='half'?'peek':'half'); }
+  function bind(node){
+    node.addEventListener('pointerdown',function(e){
+      if(window.innerWidth>=900) return;
+      drag=true; moved=false; y0=e.clientY; h0=el.getBoundingClientRect().height; el.classList.add('drag');
+      try{ node.setPointerCapture(e.pointerId); }catch(_){}
+    });
+    node.addEventListener('pointermove',function(e){
+      if(!drag) return; var dy=e.clientY-y0; if(Math.abs(dy)>6) moved=true; if(!moved) return;
+      var h=clamp(h0-dy,sheetPx('peek')-16,sheetPx('full')); setSheetVar(h); el.classList.toggle('peek',h<sheetPx('peek')+36);
+    });
+    function up(){
+      if(!drag) return; drag=false; el.classList.remove('drag');
+      if(!moved){ cycle(); return; }
+      var h=el.getBoundingClientRect().height, best='peek', bd=1e9;
+      ['peek','half','full'].forEach(function(k){ var d=Math.abs(sheetPx(k)-h); if(d<bd){ bd=d; best=k; } });
+      applySheet(best);
+    }
+    node.addEventListener('pointerup',up); node.addEventListener('pointercancel',up);
+    node.addEventListener('keydown',function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); cycle(); } });
+  }
+  bind($('grab')); bind($('peek'));
+})();
+
 // ---- menus, switches, add-mode hint
 function closeMenus(){ ['layers','add'].forEach(function(k){ $(k+'menu').hidden=true; $(k+'btn').setAttribute('aria-expanded','false'); }); }
 ['layers','add'].forEach(function(k){
@@ -1367,6 +1472,9 @@ function render(){
   renderStrip(); renderFresh();
   renderRoutes(t);
   renderTabs();
+  (function(){ var pc=r.unsafe?'var(--poor)':rating(r.score).color;
+    $('peek').innerHTML='<span class="pk-num" style="color:'+pc+'">'+r.score+'</span><span class="pk-main"><span class="pill" style="background:'+pc+'">'+
+      (r.unsafe?'Unsafe':rating(r.score).label)+'</span><span>'+esc(headlineFor(r,t))+'</span></span>'; })();
 
   var p0=t>=3?sample('pres',t-3,S.spot[0],S.spot[1]):null, dp=(p0!=null&&s.pres!=null)?s.pres-p0:null;
   var c={r:r, trend:dp==null?'':dp<=-0.7?' ↓':dp>=0.7?' ↑':' →'};
@@ -1388,7 +1496,7 @@ function render(){
   var body;
   if(S.tab==='fish') body=shore+waterTempRowHtml(t)+waterClarityRowHtml()+biteGuideHtml(t);
   else if(S.tab==='spots') body=lakesSectionHtml(t)+spotsSectionHtml(t)+tripLogHtml()+launchesSectionHtml();
-  else if(S.tab==='boat') body='<h3 style="margin-top:4px">Your boat</h3>'+hullRowHtml();
+  else if(S.tab==='boat') body=hullRowHtml();
   else body=nowTabHtml(c);
   $('detail').innerHTML=body;
 
@@ -1545,10 +1653,10 @@ function spotsSectionHtml(t){
         '<span class="spotname">'+esc(sp.name)+'</span>'+
         (parts.length?'<span class="note" style="margin-left:2px">'+parts.join(' - ')+'</span>':'')+
       '</div>'+
-      '<div class="spotbtns">'+
-        '<button class="chip sm" data-focus="'+sp.id+'">Focus</button>'+
-        '<button class="chip sm" data-catch="'+sp.id+'">Log catch</button>'+
+      '<div class="spotbtns full">'+
+        '<button class="chip sm pri" data-catch="'+sp.id+'">Caught one</button>'+
         '<button class="chip sm" data-blank="'+sp.id+'">No bites</button>'+
+        '<button class="chip sm" data-focus="'+sp.id+'">Focus</button>'+
         '<button class="chip sm" data-delspot="'+sp.id+'">Delete</button>'+
       '</div></div>';
   }).join('');
@@ -1557,6 +1665,13 @@ function spotsSectionHtml(t){
 function bindSpotsPanel(){
   var wtr=$('watertemprow'); if(wtr) wtr.onclick=promptWaterTemp;
   var wcr=$('waterclarityrow'); if(wcr) wcr.onclick=cycleClarity;
+  Array.prototype.forEach.call(document.querySelectorAll('[data-hull]'),function(b){
+    b.onclick=function(){ S.hull=b.getAttribute('data-hull'); store('wf.hull',S.hull); recompute(); render(); };
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-clarity]'),function(b){
+    b.onclick=function(){ var k=b.getAttribute('data-clarity'); S.waterClarity=(S.waterClarity===k?null:k); store('wf.waterClarity',S.waterClarity); render(); };
+  });
+  var lin=$('loadinput'); if(lin) lin.oninput=function(){ $('loadval').textContent=this.value+' lb'; };
   var hs=$('hullselect'); if(hs) hs.onchange=function(){ S.hull=this.value; store('wf.hull',S.hull); recompute(); render(); };
   var li=$('loadinput'); if(li) li.onchange=function(){
     var v=parseFloat(this.value);
