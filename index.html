@@ -22,22 +22,51 @@ a{color:var(--accent)}
 .fx{position:absolute;top:0;left:0;pointer-events:none;z-index:450}
 button{font:inherit;color:inherit;cursor:pointer}
 
-#top{position:absolute;top:0;left:0;right:0;z-index:1000;display:flex;flex-wrap:wrap;gap:8px;
+#top{position:absolute;top:0;left:0;right:0;z-index:1200;display:flex;flex-wrap:wrap;gap:8px 10px;
   align-items:center;padding:10px 12px;padding-top:max(10px,env(safe-area-inset-top));
   background:none;pointer-events:none}
 #top > *{pointer-events:auto}
-#top h1{font:600 18px var(--serif);letter-spacing:-.01em;margin:0 8px 0 0;white-space:nowrap}
-.chips{display:flex;gap:4px;flex-wrap:wrap}
+#top h1{font:600 18px var(--serif);letter-spacing:-.01em;margin:0 6px 0 0;white-space:nowrap}
 .chip{background:var(--panel2);border:0;border-radius:18px;padding:6px 13px;font-size:13px;color:var(--ink)}
 .chip.on{background:var(--ink);color:#0E181D;font-weight:600}
-#refresh{margin-left:auto}
+.seg{display:flex;gap:2px;padding:3px;background:rgba(18,31,37,.94);border-radius:22px;max-width:100%;overflow-x:auto;scrollbar-width:none}
+.seg::-webkit-scrollbar{display:none}
+.seg button{border:0;background:transparent;color:var(--muted);height:34px;padding:0 14px;border-radius:17px;font-size:13px;font-weight:500;white-space:nowrap}
+.seg button.on{background:var(--ink);color:#0E181D;font-weight:600}
+.tools{display:flex;gap:8px;align-items:center;margin-left:auto}
+.pw{position:relative}
+.tbtn,.fresh{height:40px;padding:0 14px;border:0;border-radius:20px;background:rgba(18,31,37,.94);color:var(--ink);font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.tbtn.on{background:var(--ink);color:#0E181D}
+.tbtn svg{flex:none}
+.menu{position:absolute;top:calc(100% + 8px);right:0;min-width:230px;background:var(--panel);border-radius:16px;padding:6px;box-shadow:0 8px 28px rgba(0,0,0,.45)}
+.menu[hidden]{display:none}
+.sw,.mi{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:44px;padding:0 12px;border:0;border-radius:10px;background:transparent;color:var(--ink);font-size:14px;text-align:left}
+.sw:hover,.mi:hover{background:var(--panel2)}
+.sw i{width:36px;height:22px;border-radius:11px;background:#33505A;position:relative;flex:none;transition:background .15s}
+.sw i:after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--ink);transition:left .15s}
+.sw.on i{background:var(--good)}
+.sw.on i:after{left:17px}
+.fresh .dot{width:8px;height:8px;border-radius:50%;background:var(--good);flex:none}
+.fresh.old .dot{background:var(--fair)}
+.fresh.off .dot{background:var(--poor)}
+#hint{position:absolute;z-index:1150;top:max(64px,calc(env(safe-area-inset-top) + 56px));left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;
+  background:var(--ink);color:#0E181D;border-radius:22px;padding:6px 6px 6px 16px;font-size:14px;font-weight:500;box-shadow:0 4px 18px rgba(0,0,0,.4)}
+#hint[hidden]{display:none}
+#hint button{border:0;border-radius:16px;background:#0E181D;color:var(--ink);height:32px;padding:0 14px;font-size:13px;font-weight:600}
+@media (max-width:899px){
+  .seg{order:3;flex:1 1 100%}
+  .tbtn .lbl,.fresh .pre{display:none}
+  .tbtn{width:44px;height:44px;padding:0;justify-content:center}
+  .fresh{height:44px}
+  .seg button{height:38px}
+}
+@media (min-width:900px){ .tools{margin-left:auto} }
 
-#sheet{position:absolute;z-index:1000;left:0;right:0;bottom:0;max-height:56vh;overflow:auto;
+#sheet{position:absolute;z-index:1000;left:0;right:0;bottom:0;height:46vh;overflow:auto;
   background:var(--panel);border-radius:24px 24px 0 0;
   padding:12px 16px calc(12px + env(safe-area-inset-bottom))}
 @media (min-width:900px){
-  #sheet{left:auto;top:64px;right:16px;bottom:16px;width:432px;max-height:none;border-radius:24px}
-  #legend{right:464px !important}
+  #sheet{left:auto;top:64px;right:16px;bottom:16px;width:432px;height:auto;border-radius:24px}
 }
 .row{display:flex;align-items:center;gap:10px}
 #play{width:40px;height:40px;border-radius:50%;border:0;background:var(--ink);color:#0E181D;flex:none}
@@ -75,9 +104,13 @@ li{margin:2px 0}
 .species .sphead{display:flex;align-items:center;gap:8px;font-weight:600;margin-bottom:2px}
 .species .splures{color:var(--muted);font-size:12px}
 
-#legend{position:absolute;z-index:1000;right:12px;bottom:calc(56vh + 10px);background:var(--panel);
-  border-radius:12px;padding:8px 10px;font-size:11px;width:170px}
-@media (min-width:900px){#legend{bottom:12px}}
+#mapbottom{position:absolute;z-index:1000;left:16px;right:464px;bottom:16px;display:flex;flex-direction:column;gap:10px;align-items:flex-start;pointer-events:none}
+#mapbottom>*{pointer-events:auto}
+@media (max-width:899px){#mapbottom{left:8px;right:8px;bottom:calc(46vh + 8px);gap:6px}#legend{width:170px;padding:6px 8px}#legend .lnote{display:none}}
+#legend{background:rgba(18,31,37,.94);border-radius:12px;padding:8px 10px;font-size:11px;width:210px}
+#legend .lnote{color:var(--faint);margin-top:4px;line-height:1.35}
+#dock{width:100%;max-width:760px;box-sizing:border-box;background:rgba(18,31,37,.96);border-radius:20px;padding:10px 14px 6px}
+#dock #strip{height:44px;margin:8px 0 2px}
 #legend .bar{height:8px;border-radius:4px;margin:4px 0 2px}
 #legend .ends{display:flex;justify-content:space-between;color:var(--muted)}
 
@@ -156,27 +189,46 @@ details.dt summary{min-height:44px;display:flex;align-items:center;cursor:pointe
 
 <div id="top">
   <h1>Wabamun Fishing</h1>
-  <div class="chips" id="layers"></div>
-  <button class="chip on" id="ptoggle" title="Animated wind particles">Flow</button>
-  <button class="chip" id="sat" title="Satellite imagery">Sat</button>
-  <button class="chip" id="radar" title="Live rain radar (RainViewer)">Radar</button>
-  <button class="chip" id="addspotbtn" title="Tap the map to drop a saved spot">+ Spot</button>
-  <button class="chip" id="addlaunchbtn" title="Tap the map to mark a boat launch">+ Launch</button>
-  <button class="chip" id="routes" title="Straight-line routes from your nearest launch to your best spots">Routes</button>
-  <button class="chip" id="refresh" title="Fetch the latest HRDPS run">Refresh</button>
+  <div class="seg" id="layers" role="group" aria-label="Map layer"></div>
+  <div class="tools">
+    <div class="pw">
+      <button class="tbtn" id="layersbtn" aria-haspopup="true" aria-expanded="false" aria-label="Map layers">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 13 9 5 9-5"/></svg><span class="lbl">Layers</span></button>
+      <div class="menu" id="layersmenu" hidden>
+        <button class="sw on" id="ptoggle" role="switch" aria-checked="true" title="Animated wind particles"><span>Wind flow</span><i></i></button>
+        <button class="sw" id="sat" role="switch" aria-checked="false" title="Satellite imagery"><span>Satellite</span><i></i></button>
+        <button class="sw" id="radar" role="switch" aria-checked="false" title="Live rain radar (RainViewer)"><span>Rain radar</span><i></i></button>
+        <button class="sw on" id="outl" role="switch" aria-checked="true" title="Dotted lake outlines the wave estimate uses"><span>Lake outlines</span><i></i></button>
+        <button class="sw" id="routes" role="switch" aria-checked="false" title="Straight-line routes from your nearest launch to your best spots"><span>Launch routes</span><i></i></button>
+      </div>
+    </div>
+    <div class="pw">
+      <button class="tbtn" id="addbtn" aria-haspopup="true" aria-expanded="false" aria-label="Add a spot or launch"><span aria-hidden="true" style="font-size:18px;line-height:1">+</span><span class="lbl">Add</span></button>
+      <div class="menu" id="addmenu" hidden>
+        <button class="mi" id="addspotbtn" title="Tap the map to drop a saved spot">Fishing spot</button>
+        <button class="mi" id="addlaunchbtn" title="Tap the map to mark a boat launch">Boat launch</button>
+      </div>
+    </div>
+    <button class="fresh" id="refresh" title="Fetch the latest HRDPS run"><i class="dot"></i><span><span class="pre">Updated </span><span id="freshtxt">loading</span></span></button>
+  </div>
 </div>
+<div id="hint" hidden><span id="hinttxt"></span><button id="hintx">Cancel</button></div>
 
-<div id="legend"></div>
+<div id="mapbottom">
+  <div id="legend"></div>
+  <div id="dock">
+    <div class="row">
+      <button id="play" aria-label="Play">&#9654;</button>
+      <input id="slider" type="range" min="0" max="0" value="0" aria-label="Forecast hour">
+      <div id="when">-</div>
+    </div>
+    <div id="strip"></div>
+    <div id="days"></div>
+  </div>
+</div>
 
 <div id="sheet">
   <div id="tabs" class="tabs" role="tablist"></div>
-  <div class="row">
-    <button id="play" aria-label="Play">&#9654;</button>
-    <input id="slider" type="range" min="0" max="0" value="0">
-    <div id="when">-</div>
-  </div>
-  <div id="strip"></div>
-  <div id="days"></div>
   <div id="detail"></div>
 </div>
 
@@ -239,12 +291,23 @@ var WIND_STOPS = [[0,[54,86,168,1]],[8,[47,143,191,1]],[16,[47,179,138,1]],[24,[
 var LAYERS = {
   wind: {label:'Wind', unit:'km/h', field:'spd', stops:WIND_STOPS},
   gust: {label:'Gusts', unit:'km/h', field:'gust', stops:WIND_STOPS},
+  waves:{label:'Waves', unit:'m', field:'wave', getStops:function(){ return waveStops(); }},
   temp: {label:'Temp', unit:'°C', field:'temp', stops:[[-30,[106,61,154,1]],[-20,[59,76,192,1]],[-10,[61,143,209,1]],
          [0,[111,198,201,1]],[8,[156,204,58,1]],[16,[240,192,48,1]],[24,[240,122,42,1]],[32,[217,58,58,1]]]},
   rain: {label:'Rain', unit:'mm/h', field:'precip', stops:[[0,[80,140,220,0]],[0.1,[110,170,240,.5]],[0.5,[60,120,230,.8]],
          [2,[40,70,200,1]],[5,[150,60,200,1]],[10,[230,70,160,1]]]},
   cloud:{label:'Cloud', unit:'%', field:'cloud', stops:[[0,[200,210,220,0]],[30,[200,210,220,.25]],[70,[215,222,230,.6]],[100,[235,240,245,.85]]]}
 };
+
+// Wave colours follow the selected hull's limits, so green/amber/red mean the
+// same thing here as in the Boat check. Defined as a function because the
+// limits change with the hull and the load.
+function waveStops(){
+  var B=boatLimits().wave;
+  return [[0,[47,143,191,.3]],[B.comfy*0.5,[47,179,138,.55]],[B.comfy,[156,204,58,.75]],[B.rough,[240,150,48,.9]],
+          [B.unsafe,[217,58,58,1]],[B.unsafe*1.5,[160,48,154,1]]];
+}
+function stopsOf(L_){ return L_.getStops?L_.getStops():L_.stops; }
 
 // ---------- small helpers ----------
 function $(id){ return document.getElementById(id); }
@@ -377,7 +440,7 @@ function ellipsePoints(m,n){
 }
 
 // ---------- state ----------
-var S = { data:null, idx:0, layer:store('wf.layer')||'wind', flow:store('wf.flow')!==false,
+var S = { data:null, idx:0, layer:store('wf.layer')||'wind', flow:store('wf.flow')!==false, outlines:store('wf.outlines')!==false,
           spot:store('wf.spot')||CFG.defaultSpot, scores:[], astro:null, playing:null,
           spots:store('wf.spots')||[], catches:store('wf.catches')||[],
           sat:store('wf.sat')||false, addMode:false,
@@ -852,10 +915,12 @@ CFG.regions.forEach(function(rg){
 });
 // The outlines the wave estimate is built on - dotted, so a bad fit against
 // the satellite view is obvious rather than hidden.
+var outlinesLayer=L.layerGroup();
 CFG.lakes.forEach(function(lk){
   if(!lk.model) return;
-  L.polygon(ellipsePoints(lk.model,72),{color:'#7ec8ff',weight:2,opacity:.9,dashArray:'1 6',lineCap:'round',fillColor:'#7ec8ff',fillOpacity:.06,interactive:false}).addTo(map);
+  L.polygon(ellipsePoints(lk.model,72),{color:'#7ec8ff',weight:2,opacity:.9,dashArray:'1 6',lineCap:'round',fillColor:'#7ec8ff',fillOpacity:.06,interactive:false}).addTo(outlinesLayer);
 });
+if(S.outlines) outlinesLayer.addTo(map);
 var spotMarker=L.marker(S.spot,{icon:L.divIcon({className:'',html:'<div class="spot-icon"></div>',iconSize:[16,16],iconAnchor:[8,8]}),
   title:'Your spot (tap the map to move)'}).addTo(map);
 
@@ -949,17 +1014,21 @@ function view(){
 }
 function drawHeat(){
   hctx.clearRect(0,0,W,H); if(!S.data) return;
-  var L_=LAYERS[S.layer], step=4, cw=Math.ceil(W/step), ch=Math.ceil(H/step), v=view();
+  var L_=LAYERS[S.layer], stops=stopsOf(L_), step=4, cw=Math.ceil(W/step), ch=Math.ceil(H/step), v=view(), wv=L_.field==='wave'?210:150;
   off.width=cw; off.height=ch; var img=octx.createImageData(cw,ch), px=img.data;
   for(var y=0;y<ch;y++){
     var lat=v.n-(y*step+step/2)/H*(v.n-v.s);
     for(var x=0;x<cw;x++){
       var lon=v.w+(x*step+step/2)/W*(v.e-v.w), val;
       if(L_.field==='spd'){ var w=windAt(S.idx,lat,lon); val=w?Math.hypot(w.u,w.v):null; }
+      else if(L_.field==='wave'){
+        val=null; if(lakeAt(lat,lon)){ var w2=windAt(S.idx,lat,lon);
+          if(w2){ var sp=Math.hypot(w2.u,w2.v), wf=waveFor({spd:sp,dir:(Math.atan2(-w2.u,-w2.v)*180/Math.PI+360)%360,gust:sample('gust',S.idx,lat,lon)},lat,lon); val=wf?wf.hs:null; } }
+      }
       else val=sample(L_.field,S.idx,lat,lon);
       if(val==null) continue;
-      var c=ramp(L_.stops,val), o=(y*cw+x)*4;
-      px[o]=c[0]; px[o+1]=c[1]; px[o+2]=c[2]; px[o+3]=c[3]*150;
+      var c=ramp(stops,val), o=(y*cw+x)*4;
+      px[o]=c[0]; px[o+1]=c[1]; px[o+2]=c[2]; px[o+3]=c[3]*wv;
     }
   }
   octx.putImageData(img,0,0);
@@ -1053,21 +1122,29 @@ map.on('resize',function(){ sizeCanvases(); drawHeat(); });
 function buildLayerChips(){
   var box=$('layers'); box.innerHTML='';
   Object.keys(LAYERS).forEach(function(k){
-    var b=document.createElement('button'); b.className='chip'+(k===S.layer?' on':''); b.textContent=LAYERS[k].label;
+    var b=document.createElement('button'); b.className=(k===S.layer?'on':''); b.setAttribute('aria-pressed',String(k===S.layer)); b.textContent=LAYERS[k].label;
     b.onclick=function(){ S.layer=k; store('wf.layer',k); buildLayerChips(); drawHeat(); renderLegend(); };
     box.appendChild(b);
   });
 }
 function renderLegend(){
-  var L_=LAYERS[S.layer], st=L_.stops;
+  var L_=LAYERS[S.layer], st=stopsOf(L_), isW=L_.field==='wave';
   var grad=st.map(function(s,i){ var c=s[1]; return 'rgba('+c.map(function(x,j){return j<3?Math.round(x):Math.max(.15,x);}).join(',')+') '+(i/(st.length-1)*100)+'%'; }).join(',');
+  function f(v){ return isW?(Math.round(v*100)/100).toFixed(1):v; }
+  var BL=isW?boatLimits():null;
   $('legend').innerHTML='<div>'+L_.label+' ('+L_.unit+')</div><div class="bar" style="background:linear-gradient(90deg,'+grad+')"></div>'+
-    '<div class="ends"><span>'+st[0][0]+'</span><span>'+st[Math.floor(st.length/2)][0]+'</span><span>'+st[st.length-1][0]+'+</span></div>';
+    '<div class="ends"><span>'+f(st[0][0])+'</span><span>'+f(st[Math.floor(st.length/2)][0])+'</span><span>'+f(st[st.length-1][0])+'+</span></div>'+
+    (isW?'<div class="lnote">Colours follow your hull: choppy from '+f(BL.wave.comfy)+' m, unsafe from '+f(BL.wave.unsafe)+' m. Only lakes with an outline are shaded.</div>':'');
 }
 $('ptoggle').onclick=function(){ S.flow=!S.flow; store('wf.flow',S.flow); this.classList.toggle('on',S.flow); fctx.clearRect(0,0,W,H); };
 $('ptoggle').classList.toggle('on',S.flow);
 $('sat').classList.toggle('on',S.sat);
 $('sat').onclick=function(){ S.sat=!S.sat; store('wf.sat',S.sat); setBasemap(); this.classList.toggle('on',S.sat); };
+$('outl').classList.toggle('on',S.outlines);
+$('outl').onclick=function(){
+  S.outlines=!S.outlines; store('wf.outlines',S.outlines); this.classList.toggle('on',S.outlines);
+  if(S.outlines) outlinesLayer.addTo(map); else outlinesLayer.remove();
+};
 $('addspotbtn').onclick=function(){
   S.addMode=!S.addMode; this.classList.toggle('on',S.addMode);
   map.getContainer().style.cursor=S.addMode?'crosshair':'';
@@ -1089,11 +1166,45 @@ $('play').onclick=function(){
 };
 $('refresh').onclick=function(){ load(true); };
 
+// ---- menus, switches, add-mode hint
+function closeMenus(){ ['layers','add'].forEach(function(k){ $(k+'menu').hidden=true; $(k+'btn').setAttribute('aria-expanded','false'); }); }
+['layers','add'].forEach(function(k){
+  $(k+'btn').onclick=function(e){
+    e.stopPropagation(); var open=$(k+'menu').hidden; closeMenus();
+    $(k+'menu').hidden=!open; this.setAttribute('aria-expanded',String(open));
+  };
+});
+document.addEventListener('click',function(e){ if(!e.target.closest || !e.target.closest('.pw')) closeMenus(); });
+document.addEventListener('keydown',function(e){ if(e.key==='Escape') closeMenus(); });
+$('addmenu').addEventListener('click',closeMenus);
+Array.prototype.forEach.call(document.querySelectorAll('.sw'),function(b){
+  function sync(){ b.setAttribute('aria-checked',String(b.classList.contains('on'))); }
+  sync(); new MutationObserver(sync).observe(b,{attributes:true,attributeFilter:['class']});
+});
+function syncAdd(){
+  var sp=S.addMode, ln=S.launchMode;
+  $('addbtn').classList.toggle('on',sp||ln);
+  $('hint').hidden=!(sp||ln);
+  $('hinttxt').textContent=sp?'Tap the map to drop a fishing spot':'Tap the map to mark a boat launch';
+}
+['addspotbtn','addlaunchbtn'].forEach(function(id){
+  new MutationObserver(syncAdd).observe($(id),{attributes:true,attributeFilter:['class']});
+});
+$('hintx').onclick=function(){ if(S.addMode) $('addspotbtn').click(); else if(S.launchMode) $('addlaunchbtn').click(); };
+function renderFresh(){
+  var D=S.data, f=$('refresh'); if(!D) return;
+  var age=(Date.now()-D.fetchedAt)/60000;
+  $('freshtxt').textContent=fmtTime.format(D.fetchedAt)+(D.stale?' (offline)':'');
+  f.classList.toggle('off',!!D.stale); f.classList.toggle('old',!D.stale&&age>90);
+  f.title='HRDPS forecast fetched '+fmtHour.format(D.fetchedAt)+'. Tap to refresh.';
+}
+
 function setIdx(i){ S.idx=i; $('slider').value=i; drawHeat(); render(); renderRoutes(i); }
 
 function recompute(){
   S.astro=buildAstro();
   S.scores=S.data.times.map(function(_,t){ return scoreHour(t); });
+  if(S.layer==='waves'){ drawHeat(); renderLegend(); }
 }
 
 function bestWindows(){
@@ -1114,15 +1225,19 @@ function renderStrip(){
   S.scores.forEach(function(r,t){
     var b=document.createElement('div'), rt=rating(r.score);
     b.className='b'+(t===S.idx?' sel':'')+(T[t]<now?' past':'');
-    b.style.height=Math.max(6,r.score/100*54)+'px'; b.style.backgroundColor=rt.color;
+    b.style.height=Math.max(6,r.score/100*44)+'px'; b.style.backgroundColor=rt.color;
     if(r.unsafe) b.style.backgroundImage='repeating-linear-gradient(135deg,#0E181D 0 2px,transparent 2px 5px)';
     b.title=fmtHour.format(T[t])+' - '+r.score+' '+rt.label;
     b.onclick=function(){ setIdx(t); };
     st.appendChild(b);
-    if(localHour(T[t])===0 || (t===0 && localHour(T[t])<18)){
-      var sp=document.createElement('span'); sp.textContent=fmtDay.format(T[t]);
-      sp.style.left=(t/T.length*100)+'%'; days.appendChild(sp);
-    }
+  });
+  // Day labels at each local midnight; the first bar gets one too unless a
+  // midnight is so close behind it that the two would overprint.
+  var marks=[]; T.forEach(function(ms,t){ if(localHour(ms)===0) marks.push(t); });
+  if(localHour(T[0])!==0 && localHour(T[0])<18 && (!marks.length || marks[0]>=8)) marks.unshift(0);
+  marks.forEach(function(t){
+    var sp=document.createElement('span'); sp.textContent=fmtDay.format(T[t]);
+    sp.style.left=(t/T.length*100)+'%'; days.appendChild(sp);
   });
 }
 
@@ -1249,7 +1364,7 @@ function render(){
   var T=S.data.times, t=S.idx, r=S.scores[t], s=r.s;
   var rel=Math.round((T[t]+1800000-Date.now())/3600000);
   $('when').textContent=fmtHour.format(T[t])+(rel===0?' (now)':rel>0?' (+'+rel+'h)':' ('+rel+'h)');
-  renderStrip();
+  renderStrip(); renderFresh();
   renderRoutes(t);
   renderTabs();
 
